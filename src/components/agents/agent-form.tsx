@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Agent, AgentModel, AgentTool, CreateAgentInput } from "@/lib/types";
-import { MODEL_OPTIONS, TOOL_OPTIONS } from "@/lib/ai/options";
+import type { Agent, AgentTool, CreateAgentInput } from "@/lib/types";
+import { MODEL_OPTIONS, TOOL_OPTIONS, MODEL_PROVIDERS } from "@/lib/ai/options";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +20,7 @@ export function AgentForm({ agent, onSave }: AgentFormProps) {
   const [name, setName] = useState(agent?.name ?? "");
   const [purpose, setPurpose] = useState(agent?.purpose ?? "");
   const [instructions, setInstructions] = useState(agent?.instructions ?? "");
-  const [model, setModel] = useState<AgentModel>(agent?.model ?? "gpt-4o-mini");
+  const [model, setModel] = useState(agent?.model ?? "groq:llama-3.3-70b-versatile");
   const [tools, setTools] = useState<AgentTool[]>(agent?.tools ?? []);
   const [temperature, setTemperature] = useState(agent?.temperature ?? 0.7);
   const [maxTokens, setMaxTokens] = useState(agent?.maxTokens ?? 4096);
@@ -108,25 +108,34 @@ export function AgentForm({ agent, onSave }: AgentFormProps) {
           <CardDescription>Choose the AI model for this agent.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-2">
-            {MODEL_OPTIONS.map((opt) => (
-              <label
-                key={opt.id}
-                className="flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5"
-              >
-                <input
-                  type="radio"
-                  name="model"
-                  value={opt.id}
-                  checked={model === opt.id}
-                  onChange={() => setModel(opt.id)}
-                  className="accent-primary"
-                />
-                <div>
-                  <p className="text-sm font-medium">{opt.label}</p>
-                  <p className="text-xs text-muted-foreground">{opt.description}</p>
+          <div className="space-y-4">
+            {MODEL_PROVIDERS.map((provider) => (
+              <div key={provider}>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                  {provider}
+                </p>
+                <div className="grid gap-2">
+                  {MODEL_OPTIONS.filter((opt) => opt.provider === provider).map((opt) => (
+                    <label
+                      key={opt.id}
+                      className="flex items-center gap-3 rounded-lg border px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                    >
+                      <input
+                        type="radio"
+                        name="model"
+                        value={opt.id}
+                        checked={model === opt.id}
+                        onChange={() => setModel(opt.id)}
+                        className="accent-primary"
+                      />
+                      <div>
+                        <p className="text-sm font-medium">{opt.label}</p>
+                        <p className="text-xs text-muted-foreground">{opt.description}</p>
+                      </div>
+                    </label>
+                  ))}
                 </div>
-              </label>
+              </div>
             ))}
           </div>
         </CardContent>

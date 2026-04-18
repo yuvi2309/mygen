@@ -15,12 +15,18 @@ const ChatRequestSchema = z.object({
     temperature: z.number().min(0).max(2).default(0.7),
     maxTokens: z.number().min(100).max(16000).default(4096),
   }),
+  extraTools: z.array(AgentToolSchema).default([]),
 });
 
 // ─── Route Handler ──────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
   const parsed = ChatRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -30,7 +36,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { messages, agent } = parsed.data;
+  const { messages, agent, extraTools } = parsed.data;
 
   const systemMessage = [
     `You are ${agent.name}.`,
@@ -41,18 +47,33 @@ export async function POST(request: Request) {
     .filter(Boolean)
     .join("\n\n");
 
-  const model = getModel(agent.model);
-  const tools = resolveTools(agent.tools);
+  let model;
+  try {
+    model = getModel(agent.model);
+  } catch (err) {
+    return Response.json(
+      { error: `Model error: ${err instanceof Error ? err.message : String(err)}` },
+      { status: 400 }
+    );
+  }
 
-  const result = streamText({
-    model,
-    system: systemMessage,
-    messages: await convertToModelMessages(messages),
-    tools,
-    stopWhen: stepCountIs(5),
-    temperature: agent.temperature,
-    maxOutputTokens: agent.maxTokens,
-  });
+  const allToolNames = [...new Set([...agent.tools, ...extraTools])];
+  const tools = resolveTools(allToolNames as import("@/lib/types").AgentTool[]);
 
-  return result.toUIMessageStreamResponse();
+  try {
+    const result = streamText({
+      model,
+      system: systemMessage,
+      messages: await convertToModelMessages(messages),
+      tools,
+      stopWhen: stepCountIs(5),
+      temperature: agent.temperature,
+      maxOutputTokens: agent.maxTokens,
+    });
+
+    return result.toUIMessageStreamResponse();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return Response.json({ error: message }, { status: 500 });
+  }
 }

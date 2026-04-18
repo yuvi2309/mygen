@@ -378,3 +378,213 @@ According to the MVP delivery plan:
 - **Memory system** — Agents remember context across conversations
 - **More tools** — Code execution, file upload, etc.
 - **Observability** — Token usage tracking, error monitoring
+
+---
+
+## Commit 2 — Multi-Provider Architecture, LangGraph Agent Backbone, Chat & Sidebar Fixes
+
+**Date:** April 19, 2026  
+**Scope:** Multi-provider LLM support (Groq, Google, OpenAI), LangGraph agent graph, dual-mode chat, thread persistence in sidebar, error surfacing, UI polish
+
+---
+
+### 1. What Was Built (Summary)
+
+This commit adds:
+
+- **Multi-provider model routing** — Models use `provider:model` format (e.g., `groq:llama-3.3-70b-versatile`). Provider layer routes to Groq, Google, or OpenAI.
+- **Groq as default free provider** — Free tier with generous limits, no credit card required. Replaces Google Gemini (quota issues).
+- **LangGraph agent backbone** — A LangGraph-based execution graph for agentic workflows with tool calling, separate from the AI SDK streaming chat.
+- **Dual-mode chat** — ChatInterface supports both AI SDK streaming mode and LangGraph agent mode, switchable per-agent.
+- **Thread creation + sidebar visibility** — Threads are created on first message and the sidebar reactively updates via storage events.
+- **Error surfacing** — API errors are caught and displayed in the chat UI instead of silently failing.
+- **Chat input redesign** — Input bar restructured to container layout (textarea on top, action buttons in bottom toolbar row).
+
+---
+
+### 2. New Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `@ai-sdk/groq` | ^2.0.7 | Groq provider for AI SDK |
+| `@ai-sdk/google` | ^2.1.6 | Google Gemini provider for AI SDK |
+| `@langchain/langgraph` | ^1.2.9 | Graph-based agent orchestration |
+| `@langchain/openai` | ^0.5.17 | LangChain ChatOpenAI (also used for Groq via custom baseURL) |
+| `@langchain/google-genai` | ^0.2.14 | LangChain Google Gemini integration |
+| `@langchain/core` | ^0.3.55 | LangChain base types and utilities |
+
+---
+
+### 3. Architecture Changes
+
+#### 3.1 Multi-Provider Model Routing (`src/lib/ai/provider.ts`)
+
+Model IDs changed from bare strings (`"gpt-4o"`) to `provider:model` format (`"openai:gpt-4o"`). This enables:
+- Seamless provider switching without code changes
+- Easy addition of new providers (just add a factory function)
+- Clear identification of which API key is needed
+
+```typescript
+const providers: Record<string, ProviderFactory> = {
+  google: (modelId) => google(modelId),
+  groq:   (modelId) => groq(modelId),
+  openai: (modelId) => openai(modelId),
+};
+```
+
+The `getModel(modelSpec)` function parses the spec and delegates to the right provider. Legacy bare model names fall back to Google for backward compatibility.
+
+`parseModelSpec()` utility splits `"provider:model"` for use in UI components and metadata lookups.
+
+#### 3.2 Agent Type Changes (`src/lib/types/agent.ts`)
+
+- `AgentModel` changed from `z.enum(["gpt-4o", ...])` to `z.string().min(1)` — supports any `provider:model` string
+- Default agent model: `"groq:llama-3.3-70b-versatile"`
+
+#### 3.3 Model Options (`src/lib/ai/options.ts`)
+
+`ModelOption` interface gained a `provider` field. Models are grouped by provider:
+- **Groq** (3 models) — Llama 3.3 70B (recommended), Llama 3.1 8B, Mixtral 8x7B
+- **Google** (3 models) — Gemini 2.0 Flash variants
+- **OpenAI** (5 models) — GPT-4o family + 4.1 series
+
+`MODEL_PROVIDERS` is derived for grouped UI rendering.
+
+#### 3.4 LangGraph Agent Graph (`src/lib/agent/`)
+
+New directory with four files implementing the agent execution graph:
+
+**`state.ts`** — Defines `AgentStateType` using LangGraph's `Annotation` system:
+- `messages` (with `messagesStateReducer` for append semantics)
+- `agentName`, `agentInstructions`, `agentModel`, `toolNames` — agent config
+- `stepCount`, `maxSteps` — execution limits
+
+**`nodes.ts`** — Three graph nodes:
+- `agentNode` — Calls LLM with system prompt and tool bindings, returns new message
+- `createToolNode(toolNames)` — LangGraph `ToolNode` that executes tool calls
+- `shouldContinue(state)` — Router: go to `"tools"` if last message has tool calls, else `"__end__"`
+
+The model factory supports Groq via `ChatOpenAI` with custom `baseURL: "https://api.groq.com/openai/v1"` — Groq's API is OpenAI-compatible.
+
+**`tools.ts`** — Converts AI SDK tool definitions to LangChain `DynamicStructuredTool` instances. Also exports `getAvailableToolNames()`.
+
+**`graph.ts`** — Assembles the full graph:
+```
+__start__ → agent → shouldContinue → tools → agent → ... → __end__
+```
+Configurable via `AgentGraphConfig`: model, tools, instructions, max steps, temperature.
+
+#### 3.5 Dual-Mode Chat (`src/components/chat/chat-interface.tsx`)
+
+The `ChatInterface` component now supports two modes:
+
+1. **SDK mode** (default) — Uses AI SDK `useChat` with `DefaultChatTransport` for streaming. Good for simple request/response flows.
+2. **Agent mode** — Uses the custom `useAgentChat` hook which calls the LangGraph graph via `/api/agent/chat`. Supports multi-step tool calling with step count tracking.
+
+The mode is selectable in the UI. Both modes share the same `MessageList` and `MessageInput` components.
+
+**New state:**
+- `threadCreated` — Tracks whether a thread has been created for the current conversation
+- `sdkError` — Displays API errors in a red banner
+
+**Thread creation:**
+On first message, `handleSubmit` calls `createThread(agent.id, title)` and dispatches a `storage` event so the sidebar updates immediately.
+
+#### 3.6 Agent Chat API (`src/app/api/agent/chat/route.ts`)
+
+New endpoint for LangGraph agent execution. Receives `{ messages, agent, extraTools }`, builds the graph config, invokes the graph, and returns the full message history.
+
+#### 3.7 Thread Persistence + Sidebar Reactivity
+
+**`src/hooks/use-threads.ts`** — New hook for thread CRUD. Listens for `storage` events so the sidebar updates when threads are created from the chat page.
+
+**`src/components/workspace/app-sidebar.tsx`** — Enhanced with:
+- Collapsible "Chats" section showing conversation threads
+- Thread delete functionality
+- `useThreads()` integration for reactive updates
+
+#### 3.8 Error Handling (`src/app/api/chat/route.ts`)
+
+Added try-catch around:
+- JSON body parsing
+- Model creation (catches invalid provider specs)
+- Stream creation (catches API errors like 429 rate limits)
+
+Returns structured error responses: `{ error: "message" }` with appropriate HTTP status codes.
+
+---
+
+### 4. Environment Setup
+
+Required `.env.local`:
+```env
+# Groq — free, recommended (https://console.groq.com/keys)
+GROQ_API_KEY=gsk_...
+
+# Google Gemini — free tier (https://aistudio.google.com/apikey)
+GOOGLE_GENERATIVE_AI_API_KEY=AIza...
+
+# OpenAI — paid (https://platform.openai.com/api-keys)
+OPENAI_API_KEY=sk-...
+
+# Tavily — search tool (https://tavily.com)
+TAVILY_API_KEY=tvly-...
+```
+
+Only one LLM provider key is needed. Groq recommended for free tier.
+
+---
+
+### 5. Files Changed (17 modified, 7 new)
+
+| File | Change Type | Description |
+|------|-------------|-------------|
+| `src/lib/ai/provider.ts` | **Modified** | Multi-provider routing with google/groq/openai factories |
+| `src/lib/ai/options.ts` | **Modified** | ModelOption interface + provider field, Groq models added |
+| `src/lib/ai/index.ts` | **Modified** | Exports parseModelSpec, MODEL_PROVIDERS |
+| `src/lib/types/agent.ts` | **Modified** | AgentModel → z.string(), default → groq |
+| `src/app/api/chat/route.ts` | **Modified** | Error handling (try-catch, structured errors) |
+| `src/components/chat/chat-interface.tsx` | **Modified** | Dual-mode (SDK + agent), thread creation, error display |
+| `src/components/chat/message-input.tsx` | **Modified** | Redesigned layout (textarea + toolbar row) |
+| `src/components/agents/agent-form.tsx` | **Modified** | Grouped model selector by provider |
+| `src/components/workspace/app-sidebar.tsx` | **Modified** | Chats section with threads, collapsible groups |
+| `src/app/(workspace)/chat/page.tsx` | **Modified** | Supports agent mode toggle |
+| `src/app/(workspace)/chat/[agentId]/page.tsx` | **Modified** | Supports agent mode toggle |
+| `package.json` | **Modified** | Added @ai-sdk/groq, @ai-sdk/google, @langchain/* deps |
+| `src/lib/agent/state.ts` | **New** | LangGraph state definition (Annotation-based) |
+| `src/lib/agent/nodes.ts` | **New** | Agent, tool, and router nodes |
+| `src/lib/agent/tools.ts` | **New** | LangChain tool adapter |
+| `src/lib/agent/graph.ts` | **New** | Graph assembly with configurable agent |
+| `src/app/api/agent/chat/route.ts` | **New** | LangGraph agent chat endpoint |
+| `src/hooks/use-agent-chat.ts` | **New** | React hook for agent-mode chat |
+| `src/hooks/use-threads.ts` | **New** | Thread CRUD hook with storage event listener |
+
+---
+
+### 6. Data Flow (Agent Mode)
+
+```
+User types message
+  → MessageInput.onSubmit()
+  → ChatInterface.handleSubmit()
+  → createThread() on first message, dispatch storage event
+  → useAgentChat.sendMessage(text)
+  → POST /api/agent/chat with { messages, agent, extraTools }
+  → buildAgentGraph(config) assembles state → agent → shouldContinue → tools → agent loop
+  → Graph invokes LLM (Groq/Google/OpenAI via LangChain)
+  → If tool call: ToolNode executes → result fed back → agent continues
+  → Returns final messages array
+  → useAgentChat updates state
+  → MessageList renders messages + tool call displays
+  → Sidebar picks up new thread via storage event listener
+```
+
+---
+
+### 7. What's Next
+
+- **Get Groq API key** working and verify end-to-end chat
+- **Thread message persistence** — Currently threads store metadata only, not message history
+- **Supabase migration** — Replace localStorage for production
+- **More providers** — Anthropic, Mistral, local models
+- **Memory system** — Cross-conversation context for agents

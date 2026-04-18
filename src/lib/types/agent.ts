@@ -1,8 +1,10 @@
 import { z } from "zod/v4";
 
 // ─── Agent Schema ───────────────────────────────────────────────────────────
+// Model IDs follow the format "provider:model-name" to support multi-provider.
+// Examples: "google:gemini-2.0-flash", "openai:gpt-4o-mini", "anthropic:claude-sonnet-4"
 
-export const AgentModelSchema = z.enum(["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano"]);
+export const AgentModelSchema = z.string().min(1);
 
 export const AgentToolSchema = z.enum(["web_search", "document_reader"]);
 
@@ -11,7 +13,7 @@ export const AgentSchema = z.object({
   name: z.string().min(1).max(100),
   purpose: z.string().max(500).optional(),
   instructions: z.string().max(5000).optional(),
-  model: AgentModelSchema.default("gpt-4o-mini"),
+  model: AgentModelSchema.default("groq:llama-3.3-70b-versatile"),
   tools: z.array(AgentToolSchema).default([]),
   temperature: z.number().min(0).max(2).default(0.7),
   maxTokens: z.number().min(100).max(16000).default(4096),
@@ -40,7 +42,7 @@ export const DEFAULT_AGENT: Agent = {
   name: "MyGen Assistant",
   purpose: "A general-purpose AI assistant that can help with research, writing, and analysis.",
   instructions: "You are a helpful AI assistant. Be concise, accurate, and actionable. When using tools, explain what you're doing and why.",
-  model: "gpt-4o-mini",
+  model: "groq:llama-3.3-70b-versatile",
   tools: ["web_search"],
   temperature: 0.7,
   maxTokens: 4096,

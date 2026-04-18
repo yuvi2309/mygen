@@ -12,12 +12,48 @@
 ```
 src/components/chat/chat-interface.tsx ← message-list, message-input
 src/components/chat/message-list.tsx ← tool-call-display
+src/lib/agent/graph.ts ← state, nodes, tools
+src/lib/agent/nodes.ts ← state, tools
 ```
 
-## changes (last 5 commits — 24 hours ago)
+## changes (last 5 commits — 53 minutes ago)
 ```
+src/app/(workspace)/agents/[agentId]/page.tsx +EditAgentPage  +handleSave
+src/app/(workspace)/agents/new/page.tsx       +NewAgentPage  +handleSave
+src/app/(workspace)/agents/page.tsx           +AgentsPage
+src/app/(workspace)/chat/[agentId]/page.tsx   +AgentChatPage
+src/app/(workspace)/chat/page.tsx             +ChatPage
+src/app/(workspace)/layout.tsx                +WorkspaceLayout
+src/app/(workspace)/page.tsx                  +WorkspacePage
+src/app/api/chat/route.ts                     +POST
+src/app/layout.tsx                            ~RootLayout
+src/app/page.tsx                              ~Home
+src/components/agents/agent-card.tsx          +AgentCard
+src/components/agents/agent-form.tsx          +AgentForm  +handleToggleTool  +handleSubmit
+src/components/chat/chat-interface.tsx        +ChatInterface  +handleSubmit
+src/components/chat/message-input.tsx         +MessageInput  +handleKeyDown
+src/components/chat/message-list.tsx          +isToolPart  +getToolName  +getToolState  +MessageList
+src/components/chat/tool-call-display.tsx     +ToolCallDisplay
 src/components/ui/button.tsx                  +Button
+src/components/ui/card.tsx                    +Card  +CardHeader  +CardTitle  +CardDescription
+src/components/ui/dialog.tsx                  +Dialog  +DialogTrigger  +DialogPortal  +DialogClose
+src/components/ui/input.tsx                   +Input
+src/components/ui/scroll-area.tsx             +ScrollArea  +ScrollBar
+src/components/ui/separator.tsx               +Separator
+src/components/ui/sheet.tsx                   +Sheet  +SheetTrigger  +SheetClose  +SheetPortal
+src/components/ui/sidebar.tsx                 +useSidebar  +SidebarProvider  +Sidebar  +SidebarTrigger
+src/components/ui/skeleton.tsx                +Skeleton
+src/components/ui/tabs.tsx                    +Tabs  +TabsList  +TabsTrigger  +TabsContent
+src/components/ui/textarea.tsx                +Textarea
+src/components/ui/tooltip.tsx                 +TooltipProvider  +Tooltip  +TooltipTrigger  +TooltipContent
+src/components/workspace/app-sidebar.tsx      +AppSidebar
+src/hooks/use-agents.ts                       +useAgents
+src/hooks/use-mobile.ts                       +useIsMobile
+src/lib/ai/provider.ts                        +getModel
+src/lib/ai/tools.ts                           +getTvly  +resolveTools
+src/lib/store.ts                              +generateId  +getAgents  +getAgent  +createAgent
 src/lib/utils.ts                              +cn
+docs/adr/adr-001-platform-direction.md        +objects
 ```
 
 ## docs
@@ -96,6 +132,66 @@ h3 Model Strategy
 
 ## src
 
+### src/app/(workspace)/agents/[agentId]/page.tsx
+```
+component EditAgentPage
+hook useParams
+hook useRouter
+hook useAgents
+hook useState
+hook useEffect
+handler onSave
+```
+
+### src/app/(workspace)/agents/new/page.tsx
+```
+component NewAgentPage
+hook useRouter
+hook useAgents
+handler onSave
+```
+
+### src/app/(workspace)/agents/page.tsx
+```
+component AgentsPage
+hook useAgents
+handler onDelete
+```
+
+### src/app/(workspace)/chat/[agentId]/page.tsx
+```
+component AgentChatPage
+hook useParams
+hook useRouter
+hook useAgents
+hook useState
+hook useEffect
+handler onAgentChange
+```
+
+### src/app/(workspace)/chat/page.tsx
+```
+component ChatPage
+hook useAgents
+hook useState
+handler onAgentChange
+```
+
+### src/app/(workspace)/layout.tsx
+```
+component WorkspaceLayout
+```
+
+### src/app/(workspace)/page.tsx
+```
+component WorkspacePage
+```
+
+### src/app/api/chat/route.ts
+```
+export async function POST(request)
+```
+
 ### src/app/globals.css
 ```
 var --background
@@ -135,72 +231,6 @@ component RootLayout
 component Home
 ```
 
-### src/components/ui/button.tsx
-```
-component Button
-handler onVariants
-```
-
-### src/lib/utils.ts
-```
-export function cn(...inputs)
-```
-
-### src/app/(workspace)/agents/[agentId]/page.tsx
-```
-component EditAgentPage
-hook useParams
-hook useRouter
-hook useAgents
-hook useState
-hook useEffect
-handler onSave
-```
-
-### src/app/(workspace)/agents/new/page.tsx
-```
-component NewAgentPage
-hook useRouter
-hook useAgents
-handler onSave
-```
-
-### src/app/(workspace)/agents/page.tsx
-```
-component AgentsPage
-hook useAgents
-handler onDelete
-```
-
-### src/app/(workspace)/chat/[agentId]/page.tsx
-```
-component AgentChatPage
-hook useParams
-hook useRouter
-hook useState
-hook useEffect
-```
-
-### src/app/(workspace)/chat/page.tsx
-```
-component ChatPage
-```
-
-### src/app/(workspace)/layout.tsx
-```
-component WorkspaceLayout
-```
-
-### src/app/(workspace)/page.tsx
-```
-component WorkspacePage
-```
-
-### src/app/api/chat/route.ts
-```
-export async function POST(request)
-```
-
 ### src/components/agents/agent-card.tsx
 ```
 component AgentCard
@@ -226,10 +256,15 @@ props ChatInterfaceProps
 hook useState
 hook useMemo
 hook useChat
+hook useAgentChat
 export ChatInterface
 handler onInputChange
 handler onSubmit
 handler onStop
+handler onAgentChange
+handler onExtraToolsChange
+handler onFilesChange
+handler onAgentModeChange
 ```
 
 ### src/components/chat/message-input.tsx
@@ -237,11 +272,13 @@ handler onStop
 component MessageInput
 props MessageInputProps
 hook useRef
+hook useState
 export MessageInput
 handler onSubmit
 handler onChange
 handler onKeyDown
 handler onClick
+handler onOpenChange
 ```
 
 ### src/components/chat/message-list.tsx
@@ -258,6 +295,12 @@ export MessageList
 component ToolCallDisplay
 props ToolCallDisplayProps
 export ToolCallDisplay
+```
+
+### src/components/ui/button.tsx
+```
+component Button
+handler onVariants
 ```
 
 ### src/components/ui/card.tsx
@@ -375,7 +418,10 @@ component TooltipContent
 component AppSidebar
 hook usePathname
 hook useAgents
+hook useThreads
+hook useState
 export AppSidebar
+handler onOpenChange
 ```
 
 ### src/hooks/use-agents.ts
@@ -388,9 +434,19 @@ export function useAgents() → { agents, refresh, createAgent, updateAgent, del
 export function useIsMobile()
 ```
 
+### src/lib/ai/options.ts
+```
+export interface ModelOption
+  id: string
+  label: string
+  provider: string
+  description: string
+```
+
 ### src/lib/ai/provider.ts
 ```
-export function getModel(modelId)
+export function getModel(modelSpec)
+export function parseModelSpec(modelSpec)
 ```
 
 ### src/lib/ai/tools.ts
@@ -439,4 +495,70 @@ export interface ChatThread
   messages: ChatMessage[]
   createdAt: string
   updatedAt: string
+```
+
+### src/lib/utils.ts
+```
+export function cn(...inputs)
+```
+
+### src/app/api/agent/chat/route.ts
+```
+export async function POST(request)
+```
+
+### src/hooks/use-agent-chat.ts
+```
+export interface AgentMessage
+  id: string
+  role: "user" | "assistant" | "tool"
+  content: string
+  toolCalls?: Array<{ id: string
+  name: string
+  args: Record<string, unknown>
+  toolCallId?: string
+  toolName?: string
+export interface AgentChatState
+  messages: AgentMessage[]
+  isRunning: boolean
+  currentNode: string | null
+  stepCount: number
+  error: string | null
+export function useAgentChat(agent, extraTools)
+```
+
+### src/hooks/use-threads.ts
+```
+export function useThreads(agentId?) → { threads, refresh, createThread, deleteThread }
+```
+
+### src/lib/agent/graph.ts
+```
+export interface AgentGraphConfig
+  agentName: string
+  agentInstructions?: string
+  agentModel: string
+  toolNames: string[]
+  temperature?: number
+  maxSteps?: number
+export function buildAgentGraph(config)
+```
+
+### src/lib/agent/nodes.ts
+```
+export async function agentNode(state) → Promise<Partial<AgentStateType
+export function createToolNode(toolNames)
+export function shouldContinue(state) → "tools" | "__end__"
+```
+
+### src/lib/agent/state.ts
+```
+export type AgentStateType
+export type AgentStateUpdate
+```
+
+### src/lib/agent/tools.ts
+```
+export function resolveLangChainTools(toolNames)
+export function getAvailableToolNames() → string[]
 ```

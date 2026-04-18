@@ -5,10 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import { ChatInterface } from "@/components/chat/chat-interface";
 import { type Agent, DEFAULT_AGENT } from "@/lib/types";
 import { getAgent } from "@/lib/store";
+import { useAgents } from "@/hooks/use-agents";
 
 export default function AgentChatPage() {
   const params = useParams();
   const router = useRouter();
+  const { agents } = useAgents();
   const [agent, setAgent] = useState<Agent | null>(null);
 
   useEffect(() => {
@@ -33,5 +35,16 @@ export default function AgentChatPage() {
     );
   }
 
-  return <ChatInterface agent={agent} />;
+  function handleAgentChange(newAgent: Agent) {
+    setAgent(newAgent);
+    router.replace(`/chat/${newAgent.id}`);
+  }
+
+  return (
+    <ChatInterface
+      agent={agent}
+      agents={agents}
+      onAgentChange={handleAgentChange}
+    />
+  );
 }
