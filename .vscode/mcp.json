@@ -1,0 +1,14 @@
+{
+  "servers": {
+    "sigmap": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["sigmap", "--mcp"]
+    },
+    "omni": {
+      "type": "stdio",
+      "command": "/Users/DiceAdmin/.local/bin/omni",
+      "args": ["--mcp"]
+    }
+  }
+}

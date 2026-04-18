@@ -18,6 +18,17 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## AI development workflow
+
+This repository is now configured for GitHub Copilot with:
+
+- project-wide instruction files for architecture, documentation, testing, security, and performance
+- reusable prompt files for specifications, planning, debugging, refactoring, and reviews
+- custom agents for architecture, implementation, debugging, and engineering review
+- MCP integrations for SigMap and Omni to improve context quality and terminal workflows
+
+See the project workflow guide in [docs/copilot-workflows.md](docs/copilot-workflows.md).
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

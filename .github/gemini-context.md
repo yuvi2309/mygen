@@ -1,16 +1,11 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
 
 
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
-You are a coding assistant with full knowledge of this codebase.
-Below are the code signatures extracted by SigMap v5.6.0 on 2026-04-18T18:54:59.631Z.
+You are a coding assistant with complete knowledge of this codebase.
+The following code signatures were extracted by SigMap v5.6.0 on 2026-04-18T18:54:59.632Z.
 
-Use these signatures to answer questions about the code accurately.
+These signatures represent every public function, class, and type in the project.
 
 ## Code Signatures
 

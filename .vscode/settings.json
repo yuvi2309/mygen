@@ -1,0 +1,11 @@
+{
+  "sigmap.scriptPath": "npx sigmap",
+  "chat.useCustomizationsInParentRepositories": true,
+  "github.copilot.chat.organizationCustomAgents.enabled": true,
+  "copilotContextOptimizer.llmProvider": "gemini",
+  "copilotContextOptimizer.modelName": "gemini-2.5-flash",
+  "copilotContextOptimizer.showProgressNotifications": true,
+  "terminal.integrated.env.osx": {
+    "PATH": "${env:HOME}/.local/bin:${env:PATH}"
+  }
+}
