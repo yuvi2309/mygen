@@ -2,7 +2,7 @@
 name: AI Product Architect
 description: Design AI-native product features with strong architecture, safe integrations, and clear delivery plans.
 argument-hint: Describe the product idea, constraint, or architecture problem you want to solve.
-tools: ['codebase', 'search', 'usages', 'fetch', 'problems', 'githubRepo']
+tools: ['codebase', 'search', 'usages', 'fetch', 'problems', 'githubRepo', 'edit']
 handoffs:
   - label: Write Spec
     agent: specification-writer

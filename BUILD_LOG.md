@@ -581,10 +581,123 @@ User types message
 
 ---
 
-### 7. What's Next
+### 7. Recommended Next Focus
 
-- **Get Groq API key** working and verify end-to-end chat
-- **Thread message persistence** — Currently threads store metadata only, not message history
-- **Supabase migration** — Replace localStorage for production
-- **More providers** — Anthropic, Mistral, local models
-- **Memory system** — Cross-conversation context for agents
+To stay aligned with the product vision, the next work should prioritize reliability and repeat usage over more platform breadth.
+
+1. **Persist full thread history and agent memory** — Move from demo chat to reusable work by saving messages, task context, and useful outcomes.
+2. **Ship one opinionated workflow template** — Pick a wedge such as research-to-brief or client follow-up and make it excellent end to end.
+3. **Add run visibility and approval controls** — Show step history, failures, retries, and simple human approval for sensitive actions.
+4. **Migrate to Supabase after the data model is stable** — Replace localStorage once threads, runs, and memory shape are validated in usage.
+5. **Avoid premature breadth** — Hold off on many more providers, a broad workflow builder, or lots of integrations until one repeated job clearly works.
+
+---
+
+## Commit 3 — Thread Message Persistence, URL-Addressable Threads, Vision Tightening
+
+**Date:** April 19, 2026
+**Scope:** Full thread message save/restore, URL-addressable thread pages, sidebar thread links, agent display message fixes, product vision update
+
+---
+
+### 1. What Was Built (Summary)
+
+This commit closes the first item from the recommended next-focus list: **persistent thread history**. Conversations are now saved and restored across page loads.
+
+- **Thread message persistence** — Messages are saved per-thread in localStorage (debounced auto-save) and restored when re-opening a thread.
+- **URL-addressable threads** — New route `/chat/t/[threadId]` loads a thread by ID with its full history. URLs update silently on thread creation so refreshes work.
+- **Sidebar thread links** — Thread items in the sidebar now link to `/chat/t/[threadId]` with active-state highlighting.
+- **Agent mode display fix** — Tool call messages in LangGraph agent mode now use the correct AI SDK v6 part format (`dynamic-tool` with `state: "input-available"`) and filter out raw tool-result messages.
+- **Product vision tightened** — Spec and build log updated to focus on proving one repeated workflow before expanding platform breadth.
+
+---
+
+### 2. Architecture Changes
+
+#### 2.1 Thread Message Store (`src/lib/store.ts`)
+
+New functions:
+- `getMessages(threadId)` — Reads messages from `localStorage` key `mygen_thread_msgs_{threadId}`
+- `saveMessages(threadId, messages)` — Writes messages and touches `updatedAt` on the thread
+- `updateThread(id, updates)` — Partial update for thread metadata
+- `getThread(id)` — Fetch a single thread by ID
+- `deleteThread(id)` — Now also cleans up the thread's message storage key
+
+Messages are stored separately per thread (not inside the thread object) so loading the thread list stays fast.
+
+**New type:** `StoredMessage` — serializable message format with `id`, `role`, `content`, `toolCalls`, `parts`, and `createdAt`.
+
+#### 2.2 Chat Interface Persistence (`src/components/chat/chat-interface.tsx`)
+
+New props: `threadId`, `initialMessages`
+
+**Serialization layer** — Four helper functions convert between:
+- `UIMessage` (AI SDK) ↔ `StoredMessage` (localStorage)
+- `AgentMessage` (LangGraph hook) ↔ `StoredMessage`
+
+**Auto-save** — `useEffect` watches message arrays in both SDK and agent mode. Saves are debounced (500ms) to avoid writing on every streaming token.
+
+**Thread creation** — On first message, creates a thread, sets `activeThreadId`, and calls `window.history.replaceState()` to update the URL to `/chat/t/{id}` without triggering a Next.js navigation (which would remount the component and lose in-flight messages).
+
+**Agent mode display** — Tool call parts now use `type: "dynamic-tool"` with `state: "input-available"` (correct AI SDK v6 format). Raw tool-result messages (`role: "tool"`) are filtered out of the display list.
+
+#### 2.3 Thread Page (`src/app/(workspace)/chat/t/[threadId]/page.tsx`)
+
+New route component. Loads thread metadata + messages from the store, resolves the agent, and renders `ChatInterface` with `threadId` and `initialMessages`. Redirects to `/chat` if the thread is not found.
+
+#### 2.4 Sidebar Thread Links (`src/components/workspace/app-sidebar.tsx`)
+
+Thread links changed from `/chat/{agentId}` to `/chat/t/{threadId}`. Added `isActive` prop based on current pathname for visual highlighting.
+
+#### 2.5 Agent Chat Hook (`src/hooks/use-agent-chat.ts`)
+
+Now accepts optional `initialMessages` parameter to hydrate state on mount.
+
+#### 2.6 API Schema Fix (`src/app/api/agent/chat/route.ts`)
+
+Changed `z.record(z.any())` to `z.record(z.string(), z.any())` for zod v4 compatibility (v4 requires explicit key type in records).
+
+---
+
+### 3. Files Changed (7 modified, 1 new)
+
+| File | Change Type | Description |
+|------|-------------|-------------|
+| `src/lib/store.ts` | **Modified** | Added `getMessages`, `saveMessages`, `updateThread`, `getThread`, `StoredMessage` type |
+| `src/components/chat/chat-interface.tsx` | **Modified** | Thread persistence, auto-save, URL update, agent display fix |
+| `src/hooks/use-agent-chat.ts` | **Modified** | Accept `initialMessages` parameter |
+| `src/app/api/agent/chat/route.ts` | **Modified** | zod v4 record schema fix |
+| `src/components/workspace/app-sidebar.tsx` | **Modified** | Thread links → `/chat/t/{id}`, active state |
+| `docs/specs/mygen-product-spec.md` | **Modified** | Vision, wedge, and MVP scope tightened |
+| `BUILD_LOG.md` | **Modified** | Added this entry + updated next-focus list |
+| `src/app/(workspace)/chat/t/[threadId]/page.tsx` | **New** | URL-addressable thread page |
+
+---
+
+### 4. Data Flow (Thread Persistence)
+
+```
+New conversation:
+  User sends first message
+    → handleSubmit creates thread via createThread()
+    → setActiveThreadId(thread.id)
+    → window.history.replaceState → URL becomes /chat/t/{threadId}
+    → useEffect fires on messages change → debounced saveMessages()
+
+Returning to thread:
+  User clicks thread in sidebar → navigates to /chat/t/{threadId}
+    → ThreadChatPage loads thread + messages from store
+    → Passes threadId + initialMessages to ChatInterface
+    → ChatInterface hydrates useChat/useAgentChat with initial messages
+    → Conversation continues from where it left off
+```
+
+---
+
+### 5. Product Vision Update
+
+The product spec and recommended focus were tightened:
+- **Overview** now emphasizes repeatable outcomes over platform breadth
+- **Vision** narrowed to "prove one repeated workflow" before expanding
+- **Wedge** simplified to five concrete use cases
+- **MVP scope** reworded to prioritize saved history, persisted context, and approval checkpoints before external triggers

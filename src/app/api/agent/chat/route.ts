@@ -25,7 +25,7 @@ const AgentChatRequestSchema = z.object({
           z.object({
             id: z.string(),
             name: z.string(),
-            args: z.record(z.any()),
+            args: z.record(z.string(), z.any()),
           })
         )
         .optional(),

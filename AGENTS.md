@@ -8,7 +8,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
 You are a coding assistant with full knowledge of this codebase.
-Below are the code signatures extracted by SigMap v5.6.0 on 2026-04-18T19:57:51.229Z.
+Below are the code signatures extracted by SigMap v5.6.0 on 2026-04-18T20:42:29.670Z.
 
 Use these signatures to answer questions about the code accurately.
 
@@ -27,22 +27,23 @@ src/lib/agent/graph.ts ← state, nodes, tools
 src/lib/agent/nodes.ts ← state, tools
 ```
 
-## changes (last 5 commits — 53 minutes ago)
+## changes (last 5 commits — 42 minutes ago)
 ```
 src/app/(workspace)/agents/[agentId]/page.tsx +EditAgentPage  +handleSave
 src/app/(workspace)/agents/new/page.tsx       +NewAgentPage  +handleSave
 src/app/(workspace)/agents/page.tsx           +AgentsPage
-src/app/(workspace)/chat/[agentId]/page.tsx   +AgentChatPage
+src/app/(workspace)/chat/[agentId]/page.tsx   +AgentChatPage  +handleAgentChange
 src/app/(workspace)/chat/page.tsx             +ChatPage
 src/app/(workspace)/layout.tsx                +WorkspaceLayout
 src/app/(workspace)/page.tsx                  +WorkspacePage
+src/app/api/agent/chat/route.ts               +toLangChainMessages  +POST  +formatSSEUpdate
 src/app/api/chat/route.ts                     +POST
 src/app/layout.tsx                            ~RootLayout
 src/app/page.tsx                              ~Home
 src/components/agents/agent-card.tsx          +AgentCard
 src/components/agents/agent-form.tsx          +AgentForm  +handleToggleTool  +handleSubmit
-src/components/chat/chat-interface.tsx        +ChatInterface  +handleSubmit
-src/components/chat/message-input.tsx         +MessageInput  +handleKeyDown
+src/components/chat/chat-interface.tsx        +ChatInterface  +handleSubmit  +handleStop
+src/components/chat/message-input.tsx         +MessageInput  +handleKeyDown  +handleFileSelect  +handleFileChange
 src/components/chat/message-list.tsx          +isToolPart  +getToolName  +getToolState  +MessageList
 src/components/chat/tool-call-display.tsx     +ToolCallDisplay
 src/components/ui/button.tsx                  +Button
@@ -58,9 +59,14 @@ src/components/ui/tabs.tsx                    +Tabs  +TabsList  +TabsTrigger  +T
 src/components/ui/textarea.tsx                +Textarea
 src/components/ui/tooltip.tsx                 +TooltipProvider  +Tooltip  +TooltipTrigger  +TooltipContent
 src/components/workspace/app-sidebar.tsx      +AppSidebar
+src/hooks/use-agent-chat.ts                   +useAgentChat  +handleSSEEvent
 src/hooks/use-agents.ts                       +useAgents
 src/hooks/use-mobile.ts                       +useIsMobile
-src/lib/ai/provider.ts                        +getModel
+src/hooks/use-threads.ts                      +useThreads
+src/lib/agent/graph.ts                        +buildAgentGraph  +runAgent
+src/lib/agent/nodes.ts                        +createModel  +agentNode  +createToolNode  +shouldContinue
+src/lib/agent/tools.ts                        +getTvly  +resolveLangChainTools  +getAvailableToolNames
+src/lib/ai/provider.ts                        +getModel  +parseModelSpec
 src/lib/ai/tools.ts                           +getTvly  +resolveTools
 src/lib/store.ts                              +generateId  +getAgents  +getAgent  +createAgent
 src/lib/utils.ts                              +cn
@@ -198,6 +204,11 @@ component WorkspaceLayout
 component WorkspacePage
 ```
 
+### src/app/api/agent/chat/route.ts
+```
+export async function POST(request)
+```
+
 ### src/app/api/chat/route.ts
 ```
 export async function POST(request)
@@ -268,6 +279,8 @@ hook useState
 hook useMemo
 hook useChat
 hook useAgentChat
+hook useCallback
+hook useEffect
 export ChatInterface
 handler onInputChange
 handler onSubmit
@@ -435,6 +448,26 @@ export AppSidebar
 handler onOpenChange
 ```
 
+### src/hooks/use-agent-chat.ts
+```
+export interface AgentMessage
+  id: string
+  role: "user" | "assistant" | "tool"
+  content: string
+  toolCalls?: Array<{ id: string
+  name: string
+  args: Record<string, unknown>
+  toolCallId?: string
+  toolName?: string
+export interface AgentChatState
+  messages: AgentMessage[]
+  isRunning: boolean
+  currentNode: string | null
+  stepCount: number
+  error: string | null
+export function useAgentChat(agent, extraTools, initialMessages?)
+```
+
 ### src/hooks/use-agents.ts
 ```
 export function useAgents() → { agents, refresh, createAgent, updateAgent, deleteAgent }
@@ -443,6 +476,42 @@ export function useAgents() → { agents, refresh, createAgent, updateAgent, del
 ### src/hooks/use-mobile.ts
 ```
 export function useIsMobile()
+```
+
+### src/hooks/use-threads.ts
+```
+export function useThreads(agentId?) → { threads, refresh, createThread, deleteThread }
+```
+
+### src/lib/agent/graph.ts
+```
+export interface AgentGraphConfig
+  agentName: string
+  agentInstructions?: string
+  agentModel: string
+  toolNames: string[]
+  temperature?: number
+  maxSteps?: number
+export function buildAgentGraph(config)
+```
+
+### src/lib/agent/nodes.ts
+```
+export async function agentNode(state) → Promise<Partial<AgentStateType
+export function createToolNode(toolNames)
+export function shouldContinue(state) → "tools" | "__end__"
+```
+
+### src/lib/agent/state.ts
+```
+export type AgentStateType
+export type AgentStateUpdate
+```
+
+### src/lib/agent/tools.ts
+```
+export function resolveLangChainTools(toolNames)
+export function getAvailableToolNames() → string[]
 ```
 
 ### src/lib/ai/options.ts
@@ -467,6 +536,15 @@ export function resolveTools(toolNames) → ToolSet
 
 ### src/lib/store.ts
 ```
+export interface StoredMessage
+  id: string
+  role: "user" | "assistant" | "system" | "
+  content: string
+  toolCalls?: Array<{ id: string
+  toolCallId?: string
+  toolName?: string
+  parts?: unknown[]
+  createdAt: string
 export function getAgents() → Agent[]
 export function getAgent(id) → Agent | undefined
 export function createAgent(input) → Agent
@@ -474,7 +552,11 @@ export function updateAgent(id, updates) → Agent | undefined
 export function deleteAgent(id) → boolean
 export function getThreads(agentId?) → StoredThread[]
 export function createThread(agentId, title) → StoredThread
+export function updateThread(id, updates, "title">>) → StoredThread | undefined
+export function getThread(id) → StoredThread | undefined
 export function deleteThread(id) → boolean
+export function getMessages(threadId) → StoredMessage[]
+export function saveMessages(threadId, messages) → void
 ```
 
 ### src/lib/types/agent.ts
@@ -513,63 +595,13 @@ export interface ChatThread
 export function cn(...inputs)
 ```
 
-### src/app/api/agent/chat/route.ts
+### src/app/(workspace)/chat/t/[threadId]/page.tsx
 ```
-export async function POST(request)
-```
-
-### src/hooks/use-agent-chat.ts
-```
-export interface AgentMessage
-  id: string
-  role: "user" | "assistant" | "tool"
-  content: string
-  toolCalls?: Array<{ id: string
-  name: string
-  args: Record<string, unknown>
-  toolCallId?: string
-  toolName?: string
-export interface AgentChatState
-  messages: AgentMessage[]
-  isRunning: boolean
-  currentNode: string | null
-  stepCount: number
-  error: string | null
-export function useAgentChat(agent, extraTools)
-```
-
-### src/hooks/use-threads.ts
-```
-export function useThreads(agentId?) → { threads, refresh, createThread, deleteThread }
-```
-
-### src/lib/agent/graph.ts
-```
-export interface AgentGraphConfig
-  agentName: string
-  agentInstructions?: string
-  agentModel: string
-  toolNames: string[]
-  temperature?: number
-  maxSteps?: number
-export function buildAgentGraph(config)
-```
-
-### src/lib/agent/nodes.ts
-```
-export async function agentNode(state) → Promise<Partial<AgentStateType
-export function createToolNode(toolNames)
-export function shouldContinue(state) → "tools" | "__end__"
-```
-
-### src/lib/agent/state.ts
-```
-export type AgentStateType
-export type AgentStateUpdate
-```
-
-### src/lib/agent/tools.ts
-```
-export function resolveLangChainTools(toolNames)
-export function getAvailableToolNames() → string[]
+component ThreadChatPage
+hook useParams
+hook useRouter
+hook useAgents
+hook useState
+hook useEffect
+handler onAgentChange
 ```

@@ -2,9 +2,9 @@
 
 ## 1. Overview
 
-MyGen is a multi-agent work platform that helps users create AI agents, connect them to tools, compose them into workflows, and run them across chat, APIs, webhooks, and other products.
+MyGen is an AI work platform for small teams that need repeatable outcomes, not just chat. Users create specialized agents, connect approved tools, preserve useful context, and reuse successful runs across chat and lightweight automations.
 
-The platform is not positioned as a generic chatbot. It is positioned as an operating layer for repeatable AI-powered work.
+The product is not trying to win as a generic chatbot. It is trying to become the operating layer for recurring knowledge work that teams want to run again and again with more speed, consistency, and visibility.
 
 ## 2. Problem
 
@@ -20,19 +20,20 @@ This creates fragmented prompt usage rather than durable systems.
 
 ## 3. Vision
 
-Enable users and teams to build agents once and use them anywhere. Agents should be portable, observable, tool-connected, permissioned, and reusable across work environments.
+Help users turn one repeated workflow into a reliable AI-assisted system they can trust.
+
+Near-term, MyGen should make high-value work like research, drafting, follow-up, and coordination repeatable, observable, and easy to reuse. Long-term, agents should be portable across chat, API, and event-driven channels, but the first proof point is dependable recurring work inside the product.
 
 ## 4. Product Wedge
 
-The initial wedge is workflow automation for knowledge workers and operators.
+The initial wedge is repeated execution workflows for founders, operators, agencies, and lean teams.
 
 High-value starting use cases:
-- research and synthesis
+- research to brief
 - proposal and report generation
 - customer and client follow-ups
 - support triage
 - sales and operations coordination
-- internal execution workflows
 
 ## 5. Target Users
 
@@ -93,19 +94,19 @@ Users need to:
 The MVP should focus on the smallest version of the platform that proves repeat value.
 
 ### Included in MVP
-- workspace creation and authentication
-- single-agent chat
+- workspace and agent creation
+- threaded single-agent chat with saved history
 - agent definition and editing
-- tool abstraction layer
-- 3 to 5 useful integrations
-- short-term and long-term memory
+- tool abstraction layer with 2 to 4 high-value integrations
+- short-term memory and persisted task context
 - async execution with status tracking
 - logs and observability
-- external API and webhook access
+- approval checkpoints for sensitive actions
+- one reusable workflow path or lightweight external trigger after the in-product loop proves value
 
 ### Excluded from MVP
 - marketplace
-- broad enterprise customization
+- broad enterprise customization before core repeat value is proven
 - unrestricted autonomous write access
 - dozens of integrations
 - advanced no-code visual graph builder in the first cut

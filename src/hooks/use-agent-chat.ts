@@ -29,8 +29,8 @@ export interface AgentChatState {
 
 // ─── Hook ───────────────────────────────────────────────────────────────────
 
-export function useAgentChat(agent: Agent, extraTools: AgentTool[] = []) {
-  const [messages, setMessages] = useState<AgentMessage[]>([]);
+export function useAgentChat(agent: Agent, extraTools: AgentTool[] = [], initialMessages?: AgentMessage[]) {
+  const [messages, setMessages] = useState<AgentMessage[]>(initialMessages ?? []);
   const [isRunning, setIsRunning] = useState(false);
   const [currentNode, setCurrentNode] = useState<string | null>(null);
   const [stepCount, setStepCount] = useState(0);

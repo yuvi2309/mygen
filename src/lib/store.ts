@@ -4,6 +4,9 @@ import { type Agent, type CreateAgentInput, DEFAULT_AGENT } from "@/lib/types";
 
 const STORAGE_KEY = "mygen_agents";
 const THREADS_KEY = "mygen_threads";
+function threadMessagesKey(threadId: string) {
+  return `mygen_thread_msgs_${threadId}`;
+}
 
 // ─── Agent Store ────────────────────────────────────────────────────────────
 
@@ -94,10 +97,62 @@ export function createThread(agentId: string, title: string = "New conversation"
   return thread;
 }
 
+export function updateThread(id: string, updates: Partial<Pick<StoredThread, "title">>): StoredThread | undefined {
+  const threads = getThreads();
+  const index = threads.findIndex((t) => t.id === id);
+  if (index === -1) return undefined;
+  threads[index] = {
+    ...threads[index],
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+  localStorage.setItem(THREADS_KEY, JSON.stringify(threads));
+  return threads[index];
+}
+
+export function getThread(id: string): StoredThread | undefined {
+  return getThreads().find((t) => t.id === id);
+}
+
 export function deleteThread(id: string): boolean {
   const threads = getThreads();
   const filtered = threads.filter((t) => t.id !== id);
   if (filtered.length === threads.length) return false;
   localStorage.setItem(THREADS_KEY, JSON.stringify(filtered));
+  // Clean up messages for this thread
+  localStorage.removeItem(threadMessagesKey(id));
   return true;
+}
+
+// ─── Thread Messages Store ──────────────────────────────────────────────────
+// Messages are stored separately per thread to avoid loading all messages
+// when just reading the thread list.
+
+export interface StoredMessage {
+  id: string;
+  role: "user" | "assistant" | "system" | "tool";
+  content: string;
+  toolCalls?: Array<{ id: string; name: string; args: Record<string, unknown> }>;
+  toolCallId?: string;
+  toolName?: string;
+  parts?: unknown[];
+  createdAt: string;
+}
+
+export function getMessages(threadId: string): StoredMessage[] {
+  if (typeof window === "undefined") return [];
+  const stored = localStorage.getItem(threadMessagesKey(threadId));
+  if (!stored) return [];
+  try {
+    return JSON.parse(stored) as StoredMessage[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveMessages(threadId: string, messages: StoredMessage[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(threadMessagesKey(threadId), JSON.stringify(messages));
+  // Touch the thread's updatedAt
+  updateThread(threadId, {});
 }

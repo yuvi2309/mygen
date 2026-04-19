@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import type { UIMessage } from "ai";
 import type { Agent, AgentTool } from "@/lib/types";
 import { useAgentChat, type AgentMessage } from "@/hooks/use-agent-chat";
-import { createThread } from "@/lib/store";
+import { createThread, saveMessages, type StoredMessage } from "@/lib/store";
 import { MessageList } from "./message-list";
 import { MessageInput } from "./message-input";
 
@@ -13,14 +14,77 @@ interface ChatInterfaceProps {
   agent: Agent;
   agents?: Agent[];
   onAgentChange?: (agent: Agent) => void;
+  threadId?: string;
+  initialMessages?: StoredMessage[];
 }
 
-export function ChatInterface({ agent, agents, onAgentChange }: ChatInterfaceProps) {
+// ── Serialization helpers ─────────────────────────────────────────────────
+
+function uiMessagesToStored(messages: UIMessage[]): StoredMessage[] {
+  return messages.map((m) => {
+    // Extract text content from parts
+    const textContent = m.parts
+      ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+      .map((p) => p.text)
+      .join("") ?? "";
+
+    return {
+      id: m.id,
+      role: m.role as StoredMessage["role"],
+      content: textContent,
+      parts: m.parts,
+      createdAt: new Date().toISOString(),
+    };
+  });
+}
+
+function agentMessagesToStored(messages: AgentMessage[]): StoredMessage[] {
+  return messages.map((m) => ({
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    toolCalls: m.toolCalls,
+    toolCallId: m.toolCallId,
+    toolName: m.toolName,
+    createdAt: m.timestamp?.toISOString?.() ?? new Date().toISOString(),
+  }));
+}
+
+function storedToUIMessages(messages: StoredMessage[]): UIMessage[] {
+  return messages.map((m) => ({
+    id: m.id,
+    role: m.role as UIMessage["role"],
+    parts: (m.parts as UIMessage["parts"]) ?? [{ type: "text" as const, text: m.content }],
+  }));
+}
+
+function storedToAgentMessages(messages: StoredMessage[]): AgentMessage[] {
+  return messages.map((m) => ({
+    id: m.id,
+    role: m.role as AgentMessage["role"],
+    content: m.content,
+    toolCalls: m.toolCalls,
+    toolCallId: m.toolCallId,
+    toolName: m.toolName,
+    timestamp: new Date(m.createdAt),
+  }));
+}
+
+export function ChatInterface({ agent, agents, onAgentChange, threadId: initialThreadId, initialMessages }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const [extraTools, setExtraTools] = useState<AgentTool[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [agentMode, setAgentMode] = useState(false);
-  const [threadCreated, setThreadCreated] = useState(false);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(initialThreadId ?? null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Convert initial messages for SDK mode
+  const sdkInitialMessages = useMemo(
+    () => (initialMessages?.length ? storedToUIMessages(initialMessages) : undefined),
+    // Only compute once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   // ── AI SDK mode (simple streaming) ──
   const transport = useMemo(
@@ -42,37 +106,70 @@ export function ChatInterface({ agent, agents, onAgentChange }: ChatInterfacePro
     [agent, extraTools]
   );
 
-  const sdkChat = useChat({ transport });
+  const sdkChat = useChat({ transport, messages: sdkInitialMessages });
   const sdkIsLoading = sdkChat.status === "submitted" || sdkChat.status === "streaming";
   const sdkError = sdkChat.error;
 
   // ── LangGraph agent mode (agentic loop) ──
-  const agentChat = useAgentChat(agent, extraTools);
+  const agentInitialMessages = useMemo(
+    () => (initialMessages?.length ? storedToAgentMessages(initialMessages) : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+  const agentChat = useAgentChat(agent, extraTools, agentInitialMessages);
 
   // ── Unified interface ──
   const isLoading = agentMode ? agentChat.isRunning : sdkIsLoading;
 
+  // ── Auto-save messages (debounced) ──
+  const persistMessages = useCallback((tid: string, msgs: StoredMessage[]) => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveMessages(tid, msgs);
+    }, 500);
+  }, []);
+
+  // Save SDK messages whenever they change
+  useEffect(() => {
+    if (!agentMode && activeThreadId && sdkChat.messages.length > 0) {
+      persistMessages(activeThreadId, uiMessagesToStored(sdkChat.messages));
+    }
+  }, [agentMode, activeThreadId, sdkChat.messages, persistMessages]);
+
+  // Save agent messages whenever they change
+  useEffect(() => {
+    if (agentMode && activeThreadId && agentChat.messages.length > 0) {
+      persistMessages(activeThreadId, agentMessagesToStored(agentChat.messages));
+    }
+  }, [agentMode, activeThreadId, agentChat.messages, persistMessages]);
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, []);
+
   // Convert agent messages to the format MessageList expects
-  const displayMessages = agentMode
-    ? agentChat.messages.map((m: AgentMessage) => ({
-        id: m.id,
-        role: m.role as string,
-        content: m.content,
-        parts: m.toolCalls
-          ? [
-              ...(m.content ? [{ type: "text" as const, text: m.content }] : []),
-              ...m.toolCalls.map((tc) => ({
-                type: "tool-invocation" as const,
-                toolInvocation: {
-                  toolCallId: tc.id,
+  const displayMessages: UIMessage[] = agentMode
+    ? agentChat.messages
+        .filter((m: AgentMessage) => m.role !== "tool")
+        .map((m: AgentMessage) => ({
+          id: m.id,
+          role: m.role as "user" | "assistant",
+          parts: m.toolCalls
+            ? [
+                ...(m.content ? [{ type: "text" as const, text: m.content }] : []),
+                ...m.toolCalls.map((tc) => ({
+                  type: "dynamic-tool" as const,
                   toolName: tc.name,
-                  args: tc.args,
-                  state: "call" as const,
-                },
-              })),
-            ]
-          : [{ type: "text" as const, text: m.content }],
-      }))
+                  toolCallId: tc.id,
+                  state: "input-available" as const,
+                  input: tc.args,
+                })),
+              ]
+            : [{ type: "text" as const, text: m.content }],
+        })) as UIMessage[]
     : sdkChat.messages;
 
   async function handleSubmit(e?: { preventDefault?: () => void }) {
@@ -82,13 +179,16 @@ export function ChatInterface({ agent, agents, onAgentChange }: ChatInterfacePro
     setInput("");
     setAttachedFiles([]);
 
-    // Create thread on first message so it appears in sidebar
-    if (!threadCreated) {
+    // Create thread on first message (new conversations only)
+    if (!activeThreadId) {
       const title = text.length > 50 ? text.slice(0, 50) + "…" : text;
-      createThread(agent.id, title);
-      setThreadCreated(true);
-      // Notify other components (sidebar) about the storage change
+      const thread = createThread(agent.id, title);
+      setActiveThreadId(thread.id);
+      // Notify sidebar about the new thread
       window.dispatchEvent(new Event("storage"));
+      // Update the URL silently so refreshes work, but don't trigger a
+      // Next.js navigation that would remount the component and lose the message.
+      window.history.replaceState(null, "", `/chat/t/${thread.id}`);
     }
 
     if (agentMode) {

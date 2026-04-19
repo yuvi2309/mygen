@@ -120,8 +120,11 @@ export function AppSidebar() {
                 <SidebarMenu>
                   {threads.map((thread) => (
                     <SidebarMenuItem key={thread.id}>
-                      <SidebarMenuButton asChild>
-                        <Link href={`/chat/${thread.agentId}`}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === `/chat/t/${thread.id}`}
+                      >
+                        <Link href={`/chat/t/${thread.id}`}>
                           <MessageSquare className="h-4 w-4" />
                           <span className="truncate">{thread.title}</span>
                         </Link>
