@@ -9,7 +9,6 @@
 import { StateGraph, END, START, MemorySaver } from "@langchain/langgraph";
 import { AgentState } from "./state";
 import { agentNode, createToolNode, shouldContinue } from "./nodes";
-import { resolveLangChainTools } from "./tools";
 
 export interface AgentGraphConfig {
   agentName: string;

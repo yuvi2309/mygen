@@ -1,7 +1,6 @@
 "use client";
 
 import { Globe, FileText, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface ToolCallDisplayProps {
   toolName: string;

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChatInterface } from "@/components/chat/chat-interface";
-import { type Agent, DEFAULT_AGENT } from "@/lib/types";
+import { DEFAULT_AGENT } from "@/lib/types";
 import { getAgent } from "@/lib/store";
 import { useAgents } from "@/hooks/use-agents";
 
@@ -11,21 +11,17 @@ export default function AgentChatPage() {
   const params = useParams();
   const router = useRouter();
   const { agents } = useAgents();
-  const [agent, setAgent] = useState<Agent | null>(null);
+  const agentId = params.agentId as string;
+  const agent = useMemo(() => {
+    if (agentId === "default") return DEFAULT_AGENT;
+    return getAgent(agentId) ?? null;
+  }, [agentId]);
 
   useEffect(() => {
-    const agentId = params.agentId as string;
-    if (agentId === "default") {
-      setAgent(DEFAULT_AGENT);
-      return;
-    }
-    const found = getAgent(agentId);
-    if (!found) {
+    if (!agent) {
       router.replace("/chat");
-      return;
     }
-    setAgent(found);
-  }, [params.agentId, router]);
+  }, [agent, router]);
 
   if (!agent) {
     return (
@@ -35,8 +31,7 @@ export default function AgentChatPage() {
     );
   }
 
-  function handleAgentChange(newAgent: Agent) {
-    setAgent(newAgent);
+  function handleAgentChange(newAgent: typeof DEFAULT_AGENT) {
     router.replace(`/chat/${newAgent.id}`);
   }
 

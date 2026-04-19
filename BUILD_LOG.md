@@ -4,6 +4,66 @@ This file documents every change made to the codebase, the reasoning behind arch
 
 ---
 
+## Commit 2 — Interactive Chat Workspace, Branching, and User-Scoped Memory
+
+**Date:** April 19, 2026  
+**Scope:** Advanced chat workflow upgrade — editable threads, forks, response sculpting, branch Q&A, structured rendering, and per-user workspace separation
+
+### 1. What Was Added
+
+This update turns the basic chat surface into a more useful AI workbench for iterative thinking and long-running conversations. The workspace now supports:
+
+- **user-scoped persistence** so agents, chats, and message history can be isolated per workspace user
+- **thread management tools** including pinning, archiving, bulk actions, tag editing, and thread forking
+- **message-level controls** such as edit-and-resend, clear context, reset chat, and pinning important answers
+- **selection-based workflows** where useful excerpts can be kept, trimmed down, or explored in side branches
+- **structured output rendering** for JSON, markdown tables, HTML previews, and code blocks
+
+### 2. Why This Matters
+
+The original MVP allowed chat and agent creation, but it did not yet support how real users refine AI output over time. This release improves the product in three important ways:
+
+1. **Better continuity** — users can keep valuable context without losing track of important messages.
+2. **Safer experimentation** — users can fork threads or ask about a selected excerpt without polluting the main conversation.
+3. **Improved usability at scale** — tagging, archiving, and per-user storage make the workspace more realistic for ongoing use.
+
+### 3. Key Architectural Changes
+
+#### Chat interaction layer
+
+The main chat orchestration in the UI was expanded so thread state, message metadata, and selection-driven actions are all persisted together. This includes support for:
+
+- saving message metadata such as pins, edits, curated selections, and branch conversations
+- replaying edited prompts without keeping outdated downstream responses
+- clearing active context while preserving the thread shell when needed
+
+#### Store and persistence model
+
+The local persistence layer now supports a richer workspace model:
+
+- workspace users are stored separately and can be switched from the header
+- threads now track archive state, pin state, tags, retention metadata, and fork lineage
+- stored messages support branch nodes and curated excerpts as first-class data
+
+This keeps the state model flexible enough for a future move to a database-backed implementation.
+
+#### Presentation layer improvements
+
+The conversation renderer now detects and formats structured content instead of showing everything as plain text. This makes tool output and AI responses much easier to inspect during real use.
+
+### 4. Files Primarily Affected
+
+- chat orchestration and persistence flow across the interactive workspace
+- sidebar management for thread organization and bulk actions
+- new selection API support for excerpt-specific branch answers
+- new structured content renderer and user switcher surface
+
+### 5. Quality Notes
+
+This update stays aligned with the project direction by keeping AI integrations behind clear boundaries, validating request payloads for the new selection route, and preserving a path toward future multi-user and workflow expansion.
+
+---
+
 ## Commit 1 — Phase 1 MVP: Chat UI, Agent Studio, AI Integration
 
 **Date:** April 19, 2026

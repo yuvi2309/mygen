@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { type Agent, DEFAULT_AGENT } from "@/lib/types";
+import { type Agent } from "@/lib/types";
 import { getAgents, createAgent as storeCreateAgent, updateAgent as storeUpdateAgent, deleteAgent as storeDeleteAgent } from "@/lib/store";
 import type { CreateAgentInput } from "@/lib/types";
 
 export function useAgents() {
-  const [agents, setAgents] = useState<Agent[]>([]);
+  const [agents, setAgents] = useState<Agent[]>(() => getAgents());
 
   useEffect(() => {
-    setAgents(getAgents());
+    const handler = () => setAgents(getAgents());
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
   }, []);
 
   const refresh = useCallback(() => {

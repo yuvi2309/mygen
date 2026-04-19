@@ -1,26 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AgentForm } from "@/components/agents/agent-form";
 import { useAgents } from "@/hooks/use-agents";
 import { getAgent } from "@/lib/store";
-import type { Agent, CreateAgentInput } from "@/lib/types";
+import type { CreateAgentInput } from "@/lib/types";
 
 export default function EditAgentPage() {
   const params = useParams();
   const router = useRouter();
   const { updateAgent } = useAgents();
-  const [agent, setAgent] = useState<Agent | null>(null);
+  const agent = useMemo(() => getAgent(params.agentId as string) ?? null, [params.agentId]);
 
   useEffect(() => {
-    const found = getAgent(params.agentId as string);
-    if (!found) {
+    if (!agent) {
       router.replace("/agents");
-      return;
     }
-    setAgent(found);
-  }, [params.agentId, router]);
+  }, [agent, router]);
 
   function handleSave(input: CreateAgentInput) {
     if (!agent) return;

@@ -1,26 +1,27 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { getThreads, createThread as storeCreateThread, deleteThread as storeDeleteThread } from "@/lib/store";
-
-interface StoredThread {
-  id: string;
-  agentId: string;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import {
+  getThreads,
+  createThread as storeCreateThread,
+  deleteThread as storeDeleteThread,
+  archiveThread as storeArchiveThread,
+  bulkArchiveThreads as storeBulkArchiveThreads,
+  bulkDeleteThreads as storeBulkDeleteThreads,
+  togglePinThread as storeTogglePinThread,
+  setThreadTags as storeSetThreadTags,
+  forkThread as storeForkThread,
+  type StoredThread,
+} from "@/lib/store";
 
 export function useThreads(agentId?: string) {
-  const [threads, setThreads] = useState<StoredThread[]>([]);
+  const [threads, setThreads] = useState<StoredThread[]>(() => getThreads(agentId));
 
   const refresh = useCallback(() => {
     setThreads(getThreads(agentId));
   }, [agentId]);
 
   useEffect(() => {
-    refresh();
-    // Listen for storage events (from other tabs and from same-tab dispatches)
     const handler = () => refresh();
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
@@ -38,5 +39,52 @@ export function useThreads(agentId?: string) {
     return result;
   }, [refresh]);
 
-  return { threads, refresh, createThread, deleteThread };
+  const archiveThread = useCallback((id: string, archived?: boolean) => {
+    const result = storeArchiveThread(id, archived);
+    refresh();
+    return result;
+  }, [refresh]);
+
+  const bulkArchiveThreads = useCallback((ids: string[], archived?: boolean) => {
+    const result = storeBulkArchiveThreads(ids, archived);
+    refresh();
+    return result;
+  }, [refresh]);
+
+  const bulkDeleteThreads = useCallback((ids: string[]) => {
+    const result = storeBulkDeleteThreads(ids);
+    refresh();
+    return result;
+  }, [refresh]);
+
+  const togglePinThread = useCallback((id: string) => {
+    const result = storeTogglePinThread(id);
+    refresh();
+    return result;
+  }, [refresh]);
+
+  const setThreadTags = useCallback((id: string, tags: string[]) => {
+    const result = storeSetThreadTags(id, tags);
+    refresh();
+    return result;
+  }, [refresh]);
+
+  const forkThread = useCallback((sourceThreadId: string, options?: { title?: string; upToMessageId?: string }) => {
+    const result = storeForkThread(sourceThreadId, options);
+    refresh();
+    return result;
+  }, [refresh]);
+
+  return {
+    threads,
+    refresh,
+    createThread,
+    deleteThread,
+    archiveThread,
+    bulkArchiveThreads,
+    bulkDeleteThreads,
+    togglePinThread,
+    setThreadTags,
+    forkThread,
+  };
 }

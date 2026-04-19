@@ -4,7 +4,7 @@
 
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { AIMessage, type BaseMessage } from "@langchain/core/messages";
+import { AIMessage } from "@langchain/core/messages";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import type { AgentStateType } from "./state";
 import { resolveLangChainTools } from "./tools";

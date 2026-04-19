@@ -148,6 +148,7 @@ export function useAgentChat(agent: Agent, extraTools: AgentTool[] = [], initial
 
   return {
     messages,
+    setMessages,
     isRunning,
     currentNode,
     stepCount,

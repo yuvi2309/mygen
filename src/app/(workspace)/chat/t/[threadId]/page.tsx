@@ -1,36 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChatInterface } from "@/components/chat/chat-interface";
-import { type Agent, DEFAULT_AGENT } from "@/lib/types";
-import { getAgent, getThread, getMessages, type StoredMessage } from "@/lib/store";
+import { DEFAULT_AGENT, type Agent } from "@/lib/types";
+import { getAgent, getThread, getMessages } from "@/lib/store";
 import { useAgents } from "@/hooks/use-agents";
 
 export default function ThreadChatPage() {
   const params = useParams();
   const router = useRouter();
   const { agents } = useAgents();
-  const [agent, setAgent] = useState<Agent | null>(null);
-  const [threadId, setThreadId] = useState<string | null>(null);
-  const [initialMessages, setInitialMessages] = useState<StoredMessage[] | null>(null);
+  const threadId = params.threadId as string;
+  const thread = useMemo(() => getThread(threadId), [threadId]);
+  const initialMessages = useMemo(() => (thread ? getMessages(threadId) : null), [thread, threadId]);
+  const agent = useMemo(() => {
+    if (!thread) return null;
+    return getAgent(thread.agentId) ?? DEFAULT_AGENT;
+  }, [thread]);
 
   useEffect(() => {
-    const tid = params.threadId as string;
-    const thread = getThread(tid);
     if (!thread) {
       router.replace("/chat");
-      return;
     }
+  }, [thread, router]);
 
-    setThreadId(tid);
-    setInitialMessages(getMessages(tid));
-
-    const foundAgent = getAgent(thread.agentId);
-    setAgent(foundAgent ?? DEFAULT_AGENT);
-  }, [params.threadId, router]);
-
-  if (!agent || threadId === null || initialMessages === null) {
+  if (!agent || !thread || initialMessages === null) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <p className="text-sm text-muted-foreground">Loading conversation...</p>
@@ -39,7 +34,7 @@ export default function ThreadChatPage() {
   }
 
   function handleAgentChange(newAgent: Agent) {
-    setAgent(newAgent);
+    router.replace(`/chat/${newAgent.id}`);
   }
 
   return (

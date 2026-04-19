@@ -2,7 +2,7 @@
 
 import { useRef, useState, type KeyboardEvent } from "react";
 import { Popover, DropdownMenu } from "radix-ui";
-import { ArrowUp, Bot, Loader2, Paperclip, Wrench, X, ChevronDown, Check, Zap } from "lucide-react";
+import { ArrowUp, Bot, Check, ChevronDown, Eraser, Loader2, Paperclip, RotateCcw, Wrench, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { Agent, AgentTool } from "@/lib/types";
@@ -23,6 +23,8 @@ interface MessageInputProps {
   onFilesChange?: (files: File[]) => void;
   agentMode?: boolean;
   onAgentModeChange?: (mode: boolean) => void;
+  onClearContext?: () => void;
+  onResetChat?: () => void;
 }
 
 export function MessageInput({
@@ -40,6 +42,8 @@ export function MessageInput({
   onFilesChange,
   agentMode = false,
   onAgentModeChange,
+  onClearContext,
+  onResetChat,
 }: MessageInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -208,6 +212,34 @@ export function MessageInput({
               >
                 <Zap className="h-3.5 w-3.5" />
                 <span className="text-xs hidden sm:inline">{agentMode ? "Agent" : "Simple"}</span>
+              </Button>
+            )}
+
+            {onClearContext && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="shrink-0 h-8 w-8"
+                onClick={onClearContext}
+                title="Clear chat context"
+              >
+                <Eraser className="h-3.5 w-3.5" />
+                <span className="sr-only">Clear chat context</span>
+              </Button>
+            )}
+
+            {onResetChat && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="shrink-0 h-8 w-8"
+                onClick={onResetChat}
+                title="Reset chat"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span className="sr-only">Reset chat</span>
               </Button>
             )}
 

@@ -11,18 +11,19 @@
 ## deps
 ```
 src/components/chat/chat-interface.tsx ← message-list, message-input
-src/components/chat/message-list.tsx ← tool-call-display
-src/lib/agent/graph.ts ← state, nodes, tools
+src/components/chat/message-list.tsx ← tool-call-display, structured-message-content
+src/lib/agent/graph.ts ← state, nodes
 src/lib/agent/nodes.ts ← state, tools
 ```
 
-## changes (last 5 commits — 42 minutes ago)
+## changes (last 5 commits — 71 minutes ago)
 ```
 src/app/(workspace)/agents/[agentId]/page.tsx +EditAgentPage  +handleSave
 src/app/(workspace)/agents/new/page.tsx       +NewAgentPage  +handleSave
 src/app/(workspace)/agents/page.tsx           +AgentsPage
 src/app/(workspace)/chat/[agentId]/page.tsx   +AgentChatPage  +handleAgentChange
 src/app/(workspace)/chat/page.tsx             +ChatPage
+src/app/(workspace)/chat/t/[threadId]/page.tsx +ThreadChatPage  +handleAgentChange
 src/app/(workspace)/layout.tsx                +WorkspaceLayout
 src/app/(workspace)/page.tsx                  +WorkspacePage
 src/app/api/agent/chat/route.ts               +toLangChainMessages  +POST  +formatSSEUpdate
@@ -31,7 +32,7 @@ src/app/layout.tsx                            ~RootLayout
 src/app/page.tsx                              ~Home
 src/components/agents/agent-card.tsx          +AgentCard
 src/components/agents/agent-form.tsx          +AgentForm  +handleToggleTool  +handleSubmit
-src/components/chat/chat-interface.tsx        +ChatInterface  +handleSubmit  +handleStop
+src/components/chat/chat-interface.tsx        +uiMessagesToStored  +agentMessagesToStored  +storedToUIMessages  +storedToAgentMessages
 src/components/chat/message-input.tsx         +MessageInput  +handleKeyDown  +handleFileSelect  +handleFileChange
 src/components/chat/message-list.tsx          +isToolPart  +getToolName  +getToolState  +MessageList
 src/components/chat/tool-call-display.tsx     +ToolCallDisplay
@@ -57,7 +58,7 @@ src/lib/agent/nodes.ts                        +createModel  +agentNode  +createT
 src/lib/agent/tools.ts                        +getTvly  +resolveLangChainTools  +getAvailableToolNames
 src/lib/ai/provider.ts                        +getModel  +parseModelSpec
 src/lib/ai/tools.ts                           +getTvly  +resolveTools
-src/lib/store.ts                              +generateId  +getAgents  +getAgent  +createAgent
+src/lib/store.ts                              +threadMessagesKey  +generateId  +getAgents  +getAgent
 src/lib/utils.ts                              +cn
 docs/adr/adr-001-platform-direction.md        +objects
 ```
@@ -144,7 +145,7 @@ component EditAgentPage
 hook useParams
 hook useRouter
 hook useAgents
-hook useState
+hook useMemo
 hook useEffect
 handler onSave
 ```
@@ -170,7 +171,7 @@ component AgentChatPage
 hook useParams
 hook useRouter
 hook useAgents
-hook useState
+hook useMemo
 hook useEffect
 handler onAgentChange
 ```
@@ -180,6 +181,17 @@ handler onAgentChange
 component ChatPage
 hook useAgents
 hook useState
+handler onAgentChange
+```
+
+### src/app/(workspace)/chat/t/[threadId]/page.tsx
+```
+component ThreadChatPage
+hook useParams
+hook useRouter
+hook useAgents
+hook useMemo
+hook useEffect
 handler onAgentChange
 ```
 
@@ -271,13 +283,22 @@ hook useAgentChat
 hook useCallback
 hook useEffect
 export ChatInterface
+handler onClick
+handler onEditMessage
+handler onPinMessage
+handler onForkFromMessage
+handler onKeepSelection
+handler onAskSelectionBranch
+handler onTrimMessage
+handler onRestoreMessage
+handler onRemoveSelection
+handler onSendBranchMessage
 handler onInputChange
 handler onSubmit
 handler onStop
 handler onAgentChange
 handler onExtraToolsChange
 handler onFilesChange
-handler onAgentModeChange
 ```
 
 ### src/components/chat/message-input.tsx
@@ -299,8 +320,13 @@ handler onOpenChange
 component MessageList
 props MessageListProps
 hook useRef
+hook useState
+hook useMemo
 hook useEffect
 export MessageList
+handler onMouseDown
+handler onSubmit
+handler onChange
 ```
 
 ### src/components/chat/tool-call-display.tsx
@@ -433,8 +459,10 @@ hook usePathname
 hook useAgents
 hook useThreads
 hook useState
+hook useMemo
 export AppSidebar
 handler onOpenChange
+handler onClick
 ```
 
 ### src/hooks/use-agent-chat.ts
@@ -459,7 +487,7 @@ export function useAgentChat(agent, extraTools, initialMessages?)
 
 ### src/hooks/use-agents.ts
 ```
-export function useAgents() → { agents, refresh, createAgent, updateAgent, deleteAgent }
+export function useAgents()
 ```
 
 ### src/hooks/use-mobile.ts
@@ -469,7 +497,7 @@ export function useIsMobile()
 
 ### src/hooks/use-threads.ts
 ```
-export function useThreads(agentId?) → { threads, refresh, createThread, deleteThread }
+export function useThreads(agentId?)
 ```
 
 ### src/lib/agent/graph.ts
@@ -525,27 +553,31 @@ export function resolveTools(toolNames) → ToolSet
 
 ### src/lib/store.ts
 ```
-export interface StoredMessage
+export interface WorkspaceUser
   id: string
-  role: "user" | "assistant" | "system" | "
-  content: string
-  toolCalls?: Array<{ id: string
-  toolCallId?: string
-  toolName?: string
-  parts?: unknown[]
+  name: string
   createdAt: string
-export function getAgents() → Agent[]
-export function getAgent(id) → Agent | undefined
-export function createAgent(input) → Agent
-export function updateAgent(id, updates) → Agent | undefined
-export function deleteAgent(id) → boolean
-export function getThreads(agentId?) → StoredThread[]
-export function createThread(agentId, title) → StoredThread
-export function updateThread(id, updates, "title">>) → StoredThread | undefined
-export function getThread(id) → StoredThread | undefined
-export function deleteThread(id) → boolean
-export function getMessages(threadId) → StoredMessage[]
-export function saveMessages(threadId, messages) → void
+export interface StoredThread
+  id: string
+  agentId: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  isPinned?: boolean
+  isArchived?: boolean
+  archivedAt?: string | null
+export interface StoredBranchChatMessage
+  id: string
+  role: "user" | "assistant"
+  content: string
+  createdAt: string
+  status?: "loading" | "done" | "error"
+export interface StoredMessageBranch
+  id: string
+  selectedText: string
+  createdAt: string
+  title?: string
+  messages: StoredBranchChatMessage[]
 ```
 
 ### src/lib/types/agent.ts
@@ -584,13 +616,27 @@ export interface ChatThread
 export function cn(...inputs)
 ```
 
-### src/app/(workspace)/chat/t/[threadId]/page.tsx
+### src/app/api/selection/route.ts
 ```
-component ThreadChatPage
-hook useParams
+export async function POST(request)
+```
+
+### src/components/chat/structured-message-content.tsx
+```
+component JsonTable
+component MarkdownTable
+component StructuredMessageContent
+props StructuredMessageContentProps
+export StructuredMessageContent
+handler onValue
+```
+
+### src/components/workspace/user-switcher.tsx
+```
+component UserSwitcher
 hook useRouter
-hook useAgents
 hook useState
 hook useEffect
-handler onAgentChange
+export UserSwitcher
+handler onSelect
 ```

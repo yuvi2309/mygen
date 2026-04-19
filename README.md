@@ -29,6 +29,21 @@ This repository is now configured for GitHub Copilot with:
 
 See the project workflow guide in [docs/copilot-workflows.md](docs/copilot-workflows.md).
 
+## Interactive chat workspace
+
+The chat UI now supports a richer workflow for multi-step AI work:
+
+- bulk archive and delete for chats from the sidebar
+- pinned chats and pinned message references for long threads
+- tag-based organization and archived chat management
+- edit-and-resend for earlier user prompts
+- response sculpting: select multiple parts of a long answer, keep only the useful cuts, and trim the rest away
+- tree-style side branches: ask about a selected excerpt without polluting the main chat flow
+- thread forking to branch a conversation without losing the original
+- clear-context and reset controls to save tokens and restart quickly
+- timestamped messages and structured rendering for JSON, HTML, tables, tool output, and code
+- user-level workspace segregation so each user has isolated agents, chats, and thread history
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
