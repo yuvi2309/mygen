@@ -1,12 +1,13 @@
 "use client";
 
 import { useRef, useEffect, useMemo, useState } from "react";
-import { ArrowUp, Bot, ChevronDown, GitBranch, GitFork, Pencil, Pin, PinOff, Scissors, User, X } from "lucide-react";
+import { ArrowUp, Bot, GitBranch, GitFork, Pencil, Pin, PinOff, Scissors, User, X } from "lucide-react";
 import type { UIMessage } from "ai";
 import { cn } from "@/lib/utils";
 import type { StoredMessage } from "@/lib/store";
 import { ToolCallDisplay } from "./tool-call-display";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { StructuredMessageContent } from "./structured-message-content";
 
 interface MessageListProps {
@@ -18,6 +19,7 @@ interface MessageListProps {
   onForkFromMessage?: (messageId: string) => void;
   onKeepSelection?: (messageId: string, text: string) => void;
   onAskSelectionBranch?: (messageId: string, text: string) => void;
+  onCreateBranch?: (messageId: string, text: string) => string | undefined;
   onTrimMessage?: (messageId: string) => void;
   onRestoreMessage?: (messageId: string) => void;
   onRemoveSelection?: (messageId: string, selectionText: string) => void;
@@ -29,6 +31,11 @@ interface SelectionState {
   text: string;
   x: number;
   y: number;
+}
+
+interface ActiveBranchState {
+  messageId: string;
+  branchId: string;
 }
 
 function isToolPart(part: { type: string }): boolean {
@@ -81,6 +88,7 @@ export function MessageList({
   onForkFromMessage,
   onKeepSelection,
   onAskSelectionBranch,
+  onCreateBranch,
   onTrimMessage,
   onRestoreMessage,
   onRemoveSelection,
@@ -88,7 +96,7 @@ export function MessageList({
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [selectionState, setSelectionState] = useState<SelectionState | null>(null);
-  const [openNodes, setOpenNodes] = useState<Record<string, boolean>>({});
+  const [activeBranchState, setActiveBranchState] = useState<ActiveBranchState | null>(null);
   const [branchInputs, setBranchInputs] = useState<Record<string, string>>({});
 
   const metaById = useMemo(
@@ -100,6 +108,16 @@ export function MessageList({
     () => messages.filter((message) => metaById[message.id]?.isPinned),
     [messages, metaById]
   );
+
+  const activeBranch = useMemo(() => {
+    if (!activeBranchState) return null;
+
+    const branch = (metaById[activeBranchState.messageId]?.branches ?? []).find(
+      (item) => item.id === activeBranchState.branchId
+    );
+
+    return branch ? { ...activeBranchState, branch } : null;
+  }, [activeBranchState, metaById]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -225,7 +243,7 @@ export function MessageList({
           const isTrimmed = !!meta?.originalContent && meta.originalContent !== textContent;
 
           return (
-            <div key={message.id} id={`message-${message.id}`} className="group flex gap-3">
+            <div key={message.id} id={`message-${message.id}`} className="group flex items-start gap-3">
               <div
                 className={cn(
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border",
@@ -234,6 +252,7 @@ export function MessageList({
               >
                 {message.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
               </div>
+
               <div className="min-w-0 flex-1 space-y-2">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="font-medium">{message.role === "user" ? "You" : "Agent"}</span>
@@ -244,6 +263,39 @@ export function MessageList({
                 </div>
 
                 <div className="space-y-3 rounded-xl border bg-background/60 p-3">
+                  {message.role === "assistant" && (onTrimMessage || onCreateBranch) && (
+                    <div className="flex flex-wrap items-center justify-end gap-1 border-b pb-2">
+                      {onTrimMessage && (
+                        <button
+                          type="button"
+                          onClick={() => onTrimMessage(message.id)}
+                          disabled={curatedSelections.length === 0}
+                          title={curatedSelections.length === 0 ? "Select text and keep cuts first" : "Trim this response"}
+                          className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Scissors className="h-3.5 w-3.5" />
+                          Trim response
+                        </button>
+                      )}
+
+                      {onCreateBranch && textContent && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const branchId = onCreateBranch(message.id, textContent);
+                            if (branchId) {
+                              setActiveBranchState({ messageId: message.id, branchId });
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          <GitBranch className="h-3.5 w-3.5" />
+                          Create branch
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {message.parts?.map((part, i) => {
                     if (part.type === "text" && part.text) {
                       return (
@@ -316,82 +368,6 @@ export function MessageList({
                   </div>
                 )}
 
-                {branches.length > 0 && (
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => setOpenNodes((prev) => ({ ...prev, [message.id]: !prev[message.id] }))}
-                      className="inline-flex items-center gap-2 rounded-full border bg-muted/30 px-3 py-1 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      <GitBranch className="h-3.5 w-3.5" />
-                      {branches.length} branch node{branches.length > 1 ? "s" : ""}
-                      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", openNodes[message.id] ? "rotate-180" : "")} />
-                    </button>
-
-                    {openNodes[message.id] && (
-                      <div className="ml-3 space-y-3 border-l-2 border-primary/20 pl-4">
-                        {branches.map((branch) => (
-                          <div key={branch.id} className="rounded-xl border bg-muted/20 p-3">
-                            <div className="mb-2 inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                              <GitBranch className="h-3.5 w-3.5" />
-                              {branch.title || "Side branch"}
-                            </div>
-                            <div className="rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground">
-                              {branch.selectedText}
-                            </div>
-
-                            <div className="mt-3 space-y-2">
-                              {branch.messages.map((branchMessage) => (
-                                <div
-                                  key={branchMessage.id}
-                                  className={cn(
-                                    "rounded-lg border px-2.5 py-2 text-sm",
-                                    branchMessage.role === "user" ? "bg-background" : "bg-primary/5"
-                                  )}
-                                >
-                                  <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                                    {branchMessage.role === "user" ? "You" : "Branch AI"}
-                                  </div>
-                                  {branchMessage.status === "loading" ? "Thinking…" : <StructuredMessageContent text={branchMessage.content} />}
-                                </div>
-                              ))}
-                            </div>
-
-                            {onSendBranchMessage && (
-                              <form
-                                className="mt-3 flex items-center gap-2"
-                                onSubmit={(event) => {
-                                  event.preventDefault();
-                                  const value = branchInputs[branch.id]?.trim();
-                                  if (!value) return;
-                                  onSendBranchMessage(message.id, branch.id, value);
-                                  setBranchInputs((prev) => ({ ...prev, [branch.id]: "" }));
-                                }}
-                              >
-                                <input
-                                  value={branchInputs[branch.id] ?? ""}
-                                  onChange={(event) =>
-                                    setBranchInputs((prev) => ({ ...prev, [branch.id]: event.target.value }))
-                                  }
-                                  placeholder="Continue this branch..."
-                                  className="flex-1 rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
-                                />
-                                <button
-                                  type="submit"
-                                  className="rounded-md border bg-background p-2 text-muted-foreground hover:text-foreground"
-                                  aria-label="Send branch message"
-                                >
-                                  <ArrowUp className="h-4 w-4" />
-                                </button>
-                              </form>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <div className="flex flex-wrap items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                   {onPinMessage && (
                     <button
@@ -428,6 +404,32 @@ export function MessageList({
                   )}
                 </div>
               </div>
+
+              {branches.length > 0 && (
+                <div className="flex max-h-44 w-11 shrink-0 flex-col gap-1 overflow-y-auto rounded-xl border bg-muted/30 p-1">
+                  {branches.map((branch, index) => {
+                    const isActive =
+                      activeBranchState?.messageId === message.id &&
+                      activeBranchState.branchId === branch.id;
+
+                    return (
+                      <button
+                        key={branch.id}
+                        type="button"
+                        onClick={() => setActiveBranchState({ messageId: message.id, branchId: branch.id })}
+                        className={cn(
+                          "flex min-h-8 items-center justify-center rounded-md border bg-background text-muted-foreground hover:text-foreground",
+                          isActive && "border-primary text-primary"
+                        )}
+                        title={branch.title || `Branch ${index + 1}`}
+                        aria-label={branch.title || `Branch ${index + 1}`}
+                      >
+                        <GitBranch className="h-3.5 w-3.5" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
@@ -444,6 +446,82 @@ export function MessageList({
             </div>
           </div>
         )}
+
+        <Sheet open={!!activeBranchState} onOpenChange={(open) => !open && setActiveBranchState(null)}>
+          <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
+            {activeBranch && (
+              <>
+                <SheetHeader className="border-b">
+                  <SheetTitle>{activeBranch.branch.title || "Branch chat"}</SheetTitle>
+                  <SheetDescription>Side conversation for this response</SheetDescription>
+                  <div className="mt-2 line-clamp-4 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    {activeBranch.branch.selectedText}
+                  </div>
+                </SheetHeader>
+
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <ScrollArea className="flex-1">
+                    <div className="space-y-2 p-4">
+                      {activeBranch.branch.messages.length === 0 && (
+                        <div className="rounded-lg border border-dashed bg-muted/20 px-3 py-4 text-sm text-muted-foreground">
+                          Start a side chat about this response.
+                        </div>
+                      )}
+
+                      {activeBranch.branch.messages.map((branchMessage) => (
+                        <div
+                          key={branchMessage.id}
+                          className={cn(
+                            "rounded-lg border px-2.5 py-2 text-sm",
+                            branchMessage.role === "user" ? "bg-background" : "bg-primary/5"
+                          )}
+                        >
+                          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            {branchMessage.role === "user" ? "You" : "Branch AI"}
+                          </div>
+                          {branchMessage.status === "loading" ? "Thinking…" : <StructuredMessageContent text={branchMessage.content} />}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+
+                  {onSendBranchMessage && (
+                    <form
+                      className="border-t p-3"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        if (!activeBranch) return;
+                        const value = branchInputs[activeBranch.branch.id]?.trim();
+                        if (!value) return;
+                        onSendBranchMessage(activeBranch.messageId, activeBranch.branch.id, value);
+                        setBranchInputs((prev) => ({ ...prev, [activeBranch.branch.id]: "" }));
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={activeBranch ? branchInputs[activeBranch.branch.id] ?? "" : ""}
+                          onChange={(event) => {
+                            if (!activeBranch) return;
+                            setBranchInputs((prev) => ({ ...prev, [activeBranch.branch.id]: event.target.value }));
+                          }}
+                          placeholder="Message this branch..."
+                          className="flex-1 rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                        />
+                        <button
+                          type="submit"
+                          className="rounded-md border bg-background p-2 text-muted-foreground hover:text-foreground"
+                          aria-label="Send branch message"
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              </>
+            )}
+          </SheetContent>
+        </Sheet>
 
         <div ref={bottomRef} />
       </div>

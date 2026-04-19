@@ -4,6 +4,21 @@ This file documents every change made to the codebase, the reasoning behind arch
 
 ---
 
+## Commit 3 — Branch UI Refinement and Response Actions
+
+**Date:** April 19, 2026  
+**Scope:** Small UX refinement for side-branch chat navigation
+
+This update improves the branch experience inside the chat workspace:
+
+- branch threads now appear as a **scrollable icon rail on the right side** of a response when branches exist
+- clicking a branch icon opens a **small right-side chat panel** for that branch conversation
+- assistant responses now expose **Trim response** and **Create branch** actions in the top-right area of the response card for faster iteration
+
+This keeps the main conversation cleaner while making side explorations easier to access.
+
+---
+
 ## Commit 2 — Interactive Chat Workspace, Branching, and User-Scoped Memory
 
 **Date:** April 19, 2026  

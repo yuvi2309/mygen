@@ -464,6 +464,37 @@ export function ChatInterface({
     }
   }
 
+  function handleCreateBranch(messageId: string, selectedText: string) {
+    const snippet = selectedText.trim();
+    if (!snippet) return undefined;
+
+    const branchId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    setMessageMeta((prev) => {
+      const existingBranches = prev[messageId]?.branches ?? [];
+
+      return {
+        ...prev,
+        [messageId]: {
+          ...prev[messageId],
+          branches: [
+            ...existingBranches,
+            {
+              id: branchId,
+              selectedText: snippet,
+              createdAt: now,
+              title: `Branch ${existingBranches.length + 1}`,
+              messages: [],
+            },
+          ],
+        },
+      };
+    });
+
+    return branchId;
+  }
+
   async function handleAskSelectionBranch(messageId: string, selectedText: string) {
     const snippet = selectedText.trim();
     if (!snippet) return;
@@ -680,6 +711,7 @@ export function ChatInterface({
         onForkFromMessage={handleForkFromMessage}
         onKeepSelection={handleKeepSelection}
         onAskSelectionBranch={handleAskSelectionBranch}
+        onCreateBranch={handleCreateBranch}
         onTrimMessage={handleTrimMessage}
         onRestoreMessage={handleRestoreMessage}
         onRemoveSelection={handleRemoveSelection}
