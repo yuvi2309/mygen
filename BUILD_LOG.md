@@ -4,6 +4,36 @@ This file documents every change made to the codebase, the reasoning behind arch
 
 ---
 
+## Commit 4 — Councils, Authentication Hardening, and Smart Orchestration
+
+**Date:** April 20, 2026  
+**Scope:** New council workspace, login reliability fixes, and expert-debate UX polish
+
+This update turns the earlier council concept into a true product surface instead of a chat-only mode.
+
+### What changed
+
+- added a dedicated **Councils** area with saved councils, separate routes, edit flows, and reusable council discussions
+- introduced a full **authentication flow** with sign-in, callback handling, session-aware workspace identity, and a cleaner account switcher/sign-out experience
+- simplified workspace sync to a **local-only safe mode** to avoid oversized session metadata and post-login failures
+- upgraded the council engine so the **council head selects which experts should speak each round** before producing the final consolidated answer
+- added the ability to **minimize or expand individual expert responses** for a cleaner debate view
+
+### Why this matters
+
+The product now supports two distinct modes of work:
+
+1. **Single-agent chat** for fast execution and direct assistance
+2. **Council discussions** for higher-quality reasoning through critique, validation, and synthesis
+
+This also resolved the major login issue affecting the workspace after authentication, making the app much more reliable for real use.
+
+### Verification
+
+The latest state was verified with a clean lint and production build pass before release.
+
+---
+
 ## Commit 3 — Branch UI Refinement and Response Actions
 
 **Date:** April 19, 2026  

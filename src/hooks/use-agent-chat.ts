@@ -9,6 +9,7 @@ export interface AgentMessage {
   id: string;
   role: "user" | "assistant" | "tool";
   content: string;
+  node?: string;
   toolCalls?: Array<{
     id: string;
     name: string;
@@ -81,6 +82,8 @@ export function useAgentChat(agent: Agent, extraTools: AgentTool[] = [], initial
               tools: agent.tools,
               temperature: agent.temperature,
               maxTokens: agent.maxTokens,
+              mode: agent.mode,
+              council: agent.council,
             },
             extraTools,
           }),
@@ -178,9 +181,8 @@ function handleSSEEvent(
       if (!content) break;
 
       setMessages((prev) => {
-        // If last message is an assistant message from the same node, append
         const last = prev[prev.length - 1];
-        if (last?.role === "assistant" && !last.toolCalls?.length) {
+        if (last?.role === "assistant" && !last.toolCalls?.length && last.node === node) {
           return [
             ...prev.slice(0, -1),
             { ...last, content: last.content + content },
@@ -192,6 +194,7 @@ function handleSSEEvent(
             id: crypto.randomUUID(),
             role: "assistant",
             content,
+            node,
             timestamp: new Date(),
           },
         ];
@@ -211,6 +214,7 @@ function handleSSEEvent(
           id: crypto.randomUUID(),
           role: "assistant",
           content: "",
+          node,
           toolCalls,
           timestamp: new Date(),
         },
@@ -228,6 +232,7 @@ function handleSSEEvent(
           id: crypto.randomUUID(),
           role: "tool",
           content,
+          node,
           toolCallId,
           toolName,
           timestamp: new Date(),

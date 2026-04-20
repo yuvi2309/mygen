@@ -1,2 +1,20 @@
-export { type Agent, type AgentModel, type AgentTool, type CreateAgentInput, AgentSchema, CreateAgentSchema, AgentModelSchema, AgentToolSchema, DEFAULT_AGENT } from "./agent";
+export {
+  type Agent,
+  type AgentModel,
+  type AgentTool,
+  type AgentMode,
+  type CouncilExpert,
+  type CouncilConfig,
+  type CreateAgentInput,
+  AgentSchema,
+  CreateAgentSchema,
+  AgentModelSchema,
+  AgentToolSchema,
+  AgentModeSchema,
+  CouncilExpertSchema,
+  CouncilConfigSchema,
+  DEFAULT_AGENT,
+  DEFAULT_COUNCIL_CONFIG,
+  DEFAULT_COUNCIL_EXPERTS,
+} from "./agent";
 export { type ChatMessage, type ToolInvocation, type ChatThread } from "./chat";

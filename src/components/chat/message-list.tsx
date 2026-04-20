@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useMemo, useState } from "react";
-import { ArrowUp, Bot, GitBranch, GitFork, Pencil, Pin, PinOff, Scissors, User, X } from "lucide-react";
+import { ArrowUp, Bot, ChevronDown, GitBranch, GitFork, Pencil, Pin, PinOff, Scissors, User, X } from "lucide-react";
 import type { UIMessage } from "ai";
 import { cn } from "@/lib/utils";
 import type { StoredMessage } from "@/lib/store";
@@ -70,6 +70,15 @@ function formatTimestamp(value?: string) {
       });
 }
 
+function formatNodeLabel(value?: string) {
+  if (!value) return "Agent";
+  return value
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function getTextContent(message: UIMessage) {
   return (
     message.parts
@@ -98,6 +107,7 @@ export function MessageList({
   const [selectionState, setSelectionState] = useState<SelectionState | null>(null);
   const [activeBranchState, setActiveBranchState] = useState<ActiveBranchState | null>(null);
   const [branchInputs, setBranchInputs] = useState<Record<string, string>>({});
+  const [collapsedMessages, setCollapsedMessages] = useState<Record<string, boolean>>({});
 
   const metaById = useMemo(
     () => Object.fromEntries(messageMeta.map((message) => [message.id, message])),
@@ -241,6 +251,8 @@ export function MessageList({
           const curatedSelections = meta?.curatedSelections ?? [];
           const branches = meta?.branches ?? [];
           const isTrimmed = !!meta?.originalContent && meta.originalContent !== textContent;
+          const isCollapsed = !!collapsedMessages[message.id];
+          const isExpertMessage = message.role === "assistant" && !!meta?.node && meta.node !== "agent";
 
           return (
             <div key={message.id} id={`message-${message.id}`} className="group flex items-start gap-3">
@@ -255,7 +267,7 @@ export function MessageList({
 
               <div className="min-w-0 flex-1 space-y-2">
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="font-medium">{message.role === "user" ? "You" : "Agent"}</span>
+                  <span className="font-medium">{message.role === "user" ? "You" : formatNodeLabel(meta?.node)}</span>
                   {meta?.isPinned && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">Pinned</span>}
                   {meta?.editedAt && <span className="rounded-full bg-muted px-2 py-0.5">Edited</span>}
                   {isTrimmed && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-700 dark:text-emerald-300">Trimmed</span>}
@@ -263,40 +275,63 @@ export function MessageList({
                 </div>
 
                 <div className="space-y-3 rounded-xl border bg-background/60 p-3">
-                  {message.role === "assistant" && (onTrimMessage || onCreateBranch) && (
-                    <div className="flex flex-wrap items-center justify-end gap-1 border-b pb-2">
-                      {onTrimMessage && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+                    <div className="text-xs text-muted-foreground">
+                      {isExpertMessage ? "Council expert response" : message.role === "assistant" ? "Response" : "Message"}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {isExpertMessage && (
                         <button
                           type="button"
-                          onClick={() => onTrimMessage(message.id)}
-                          disabled={curatedSelections.length === 0}
-                          title={curatedSelections.length === 0 ? "Select text and keep cuts first" : "Trim this response"}
-                          className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <Scissors className="h-3.5 w-3.5" />
-                          Trim response
-                        </button>
-                      )}
-
-                      {onCreateBranch && textContent && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const branchId = onCreateBranch(message.id, textContent);
-                            if (branchId) {
-                              setActiveBranchState({ messageId: message.id, branchId });
-                            }
-                          }}
+                          onClick={() =>
+                            setCollapsedMessages((prev) => ({
+                              ...prev,
+                              [message.id]: !prev[message.id],
+                            }))
+                          }
                           className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
                         >
-                          <GitBranch className="h-3.5 w-3.5" />
-                          Create branch
+                          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isCollapsed && "-rotate-90")} />
+                          {isCollapsed ? "Expand" : "Minimize"}
                         </button>
                       )}
-                    </div>
-                  )}
 
-                  {message.parts?.map((part, i) => {
+                      {message.role === "assistant" && (onTrimMessage || onCreateBranch) && (
+                        <>
+                          {onTrimMessage && (
+                            <button
+                              type="button"
+                              onClick={() => onTrimMessage(message.id)}
+                              disabled={curatedSelections.length === 0}
+                              title={curatedSelections.length === 0 ? "Select text and keep cuts first" : "Trim this response"}
+                              className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <Scissors className="h-3.5 w-3.5" />
+                              Trim response
+                            </button>
+                          )}
+
+                          {onCreateBranch && textContent && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const branchId = onCreateBranch(message.id, textContent);
+                                if (branchId) {
+                                  setActiveBranchState({ messageId: message.id, branchId });
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                            >
+                              <GitBranch className="h-3.5 w-3.5" />
+                              Create branch
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {!isCollapsed && message.parts?.map((part, i) => {
                     if (part.type === "text" && part.text) {
                       return (
                         <div key={i} onMouseUp={() => handleTextSelection(message.id)} className="select-text">
@@ -318,6 +353,12 @@ export function MessageList({
                     }
                     return null;
                   })}
+
+                  {isCollapsed && (
+                    <div className="text-sm text-muted-foreground">
+                      Response hidden. Expand to view this expert&rsquo;s reasoning.
+                    </div>
+                  )}
                 </div>
 
                 {curatedSelections.length > 0 && (

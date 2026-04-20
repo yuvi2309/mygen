@@ -9,8 +9,8 @@
 
 import { z } from "zod/v4";
 import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from "@langchain/core/messages";
-import { streamAgent, type AgentGraphConfig } from "@/lib/agent";
-import { AgentModelSchema, AgentToolSchema } from "@/lib/types";
+import { streamAgent, streamCouncilAgent, type AgentGraphConfig } from "@/lib/agent";
+import { AgentModelSchema, AgentToolSchema, AgentModeSchema, CouncilConfigSchema } from "@/lib/types";
 
 // ─── Request Schema ─────────────────────────────────────────────────────────
 
@@ -38,6 +38,8 @@ const AgentChatRequestSchema = z.object({
     tools: z.array(AgentToolSchema).default([]),
     temperature: z.number().min(0).max(2).default(0.7),
     maxTokens: z.number().min(100).max(16000).default(4096),
+    mode: AgentModeSchema.default("single"),
+    council: CouncilConfigSchema.optional(),
   }),
   extraTools: z.array(AgentToolSchema).default([]),
   threadId: z.string().optional(),
@@ -101,6 +103,7 @@ export async function POST(request: Request) {
     agentInstructions: agent.instructions,
     agentModel: agent.model,
     toolNames: allToolNames,
+    temperature: agent.temperature,
     maxSteps,
   };
 
@@ -111,11 +114,20 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        for await (const update of streamAgent(
-          config,
-          langchainMessages,
-          threadId
-        )) {
+        const executionStream =
+          agent.mode === "council" && agent.council
+            ? streamCouncilAgent(
+                {
+                  ...config,
+                  council: agent.council,
+                  temperature: agent.temperature,
+                },
+                langchainMessages,
+                threadId
+              )
+            : streamAgent(config, langchainMessages, threadId);
+
+        for await (const update of executionStream) {
           // Each update is { nodeName: { messages: [...], ...stateUpdates } }
           const event = formatSSEUpdate(update);
           controller.enqueue(encoder.encode(event));

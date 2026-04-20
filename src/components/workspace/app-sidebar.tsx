@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Collapsible } from "radix-ui";
-import { Archive, Bot, ChevronDown, MessageSquare, Plus, Settings, Star, Tag, Trash2 } from "lucide-react";
+import { Archive, Bot, ChevronDown, MessageSquare, Plus, Settings, Star, Tag, Trash2, Users } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -34,7 +34,9 @@ export function AppSidebar() {
     setThreadTags,
   } = useThreads();
   const [agentsOpen, setAgentsOpen] = useState(true);
+  const [councilsOpen, setCouncilsOpen] = useState(true);
   const [chatsOpen, setChatsOpen] = useState(true);
+  const [discussionsOpen, setDiscussionsOpen] = useState(true);
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [manageMode, setManageMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -45,8 +47,16 @@ export function AppSidebar() {
     [threads, selectedTag]
   );
 
+  const councilAgents = agents.filter((agent) => agent.mode === "council");
+  const singleAgents = agents.filter((agent) => agent.mode !== "council");
+  const councilAgentIds = new Set(councilAgents.map((agent) => agent.id));
+
   const activeThreads = visibleThreads.filter((thread) => !thread.isArchived);
   const archivedThreads = visibleThreads.filter((thread) => thread.isArchived);
+  const activeChatThreads = activeThreads.filter((thread) => !councilAgentIds.has(thread.agentId));
+  const activeCouncilThreads = activeThreads.filter((thread) => councilAgentIds.has(thread.agentId));
+  const archivedChatThreads = archivedThreads.filter((thread) => !councilAgentIds.has(thread.agentId));
+  const archivedCouncilThreads = archivedThreads.filter((thread) => councilAgentIds.has(thread.agentId));
   const allTags = Array.from(new Set(threads.flatMap((thread) => thread.tags ?? []))).sort();
 
   function toggleSelected(id: string) {
@@ -97,6 +107,14 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/councils" || pathname === "/councils/new"}>
+                  <Link href="/councils">
+                    <Users className="h-4 w-4" />
+                    <span>Councils</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -121,7 +139,7 @@ export function AppSidebar() {
             <Collapsible.Content>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {agents.map((agent) => (
+                  {singleAgents.map((agent) => (
                     <SidebarMenuItem key={agent.id}>
                       <SidebarMenuButton
                         asChild
@@ -134,9 +152,53 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
-                  {agents.length === 0 && (
+                  {singleAgents.length === 0 && (
                     <p className="px-4 py-2 text-xs text-muted-foreground">
                       No agents yet. Create one to get started.
+                    </p>
+                  )}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </Collapsible.Content>
+          </SidebarGroup>
+        </Collapsible.Root>
+
+        <SidebarSeparator />
+
+        <Collapsible.Root open={councilsOpen} onOpenChange={setCouncilsOpen}>
+          <SidebarGroup>
+            <SidebarGroupLabel className="flex items-center justify-between pr-1">
+              <Collapsible.Trigger asChild>
+                <button className="flex items-center gap-1 text-xs font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-foreground">
+                  <ChevronDown className={`h-3 w-3 transition-transform ${councilsOpen ? "" : "-rotate-90"}`} />
+                  <span>Councils</span>
+                </button>
+              </Collapsible.Trigger>
+              <Button variant="ghost" size="icon" className="h-5 w-5" asChild>
+                <Link href="/councils/new">
+                  <Plus className="h-3 w-3" />
+                </Link>
+              </Button>
+            </SidebarGroupLabel>
+            <Collapsible.Content>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {councilAgents.map((agent) => (
+                    <SidebarMenuItem key={agent.id}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === `/councils/${agent.id}` || pathname === `/councils/${agent.id}/edit`}
+                      >
+                        <Link href={`/councils/${agent.id}`}>
+                          <Users className="h-4 w-4" />
+                          <span className="truncate">{agent.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                  {councilAgents.length === 0 && (
+                    <p className="px-4 py-2 text-xs text-muted-foreground">
+                      No councils yet. Create one to start group discussions.
                     </p>
                   )}
                 </SidebarMenu>
@@ -202,7 +264,7 @@ export function AppSidebar() {
                   )}
 
                   <div className="space-y-1">
-                    {activeThreads.map((thread) => (
+                    {activeChatThreads.map((thread) => (
                       <div key={thread.id} className="group flex items-start gap-2 rounded-md border px-2 py-2">
                         {manageMode && (
                           <input
@@ -261,14 +323,14 @@ export function AppSidebar() {
                       </div>
                     ))}
 
-                    {activeThreads.length === 0 && (
+                    {activeChatThreads.length === 0 && (
                       <p className="px-2 py-1 text-xs text-muted-foreground">
                         No active chats yet.
                       </p>
                     )}
                   </div>
 
-                  {archivedThreads.length > 0 && (
+                  {archivedChatThreads.length > 0 && (
                     <Collapsible.Root open={archivedOpen} onOpenChange={setArchivedOpen}>
                       <div className="rounded-md border p-1">
                         <Collapsible.Trigger asChild>
@@ -279,7 +341,7 @@ export function AppSidebar() {
                         </Collapsible.Trigger>
                         <Collapsible.Content>
                           <div className="space-y-1 px-1 pb-1">
-                            {archivedThreads.map((thread) => (
+                            {archivedChatThreads.map((thread) => (
                               <div key={thread.id} className="group flex items-start gap-2 rounded-md px-2 py-2">
                                 {manageMode && (
                                   <input
@@ -306,6 +368,61 @@ export function AppSidebar() {
                         </Collapsible.Content>
                       </div>
                     </Collapsible.Root>
+                  )}
+                </div>
+              </SidebarGroupContent>
+            </Collapsible.Content>
+          </SidebarGroup>
+        </Collapsible.Root>
+
+        <SidebarSeparator />
+
+        <Collapsible.Root open={discussionsOpen} onOpenChange={setDiscussionsOpen}>
+          <SidebarGroup>
+            <SidebarGroupLabel className="flex items-center justify-between gap-2 pr-1">
+              <Collapsible.Trigger asChild>
+                <button className="flex items-center gap-1 text-xs font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-foreground">
+                  <ChevronDown className={`h-3 w-3 transition-transform ${discussionsOpen ? "" : "-rotate-90"}`} />
+                  <span>Council discussions</span>
+                </button>
+              </Collapsible.Trigger>
+            </SidebarGroupLabel>
+            <Collapsible.Content>
+              <SidebarGroupContent>
+                <div className="space-y-2 px-2">
+                  <div className="space-y-1">
+                    {activeCouncilThreads.map((thread) => (
+                      <div key={thread.id} className="group flex items-start gap-2 rounded-md border px-2 py-2">
+                        <Link href={`/councils/t/${thread.id}`} className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1 text-sm">
+                            {thread.isPinned && <Star className="h-3.5 w-3.5 fill-current text-amber-500" />}
+                            <span className="truncate">{thread.title}</span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {thread.messageCount ?? 0} messages
+                          </div>
+                        </Link>
+                      </div>
+                    ))}
+
+                    {activeCouncilThreads.length === 0 && (
+                      <p className="px-2 py-1 text-xs text-muted-foreground">
+                        No council discussions yet.
+                      </p>
+                    )}
+                  </div>
+
+                  {archivedCouncilThreads.length > 0 && (
+                    <div className="rounded-md border p-1">
+                      <p className="px-2 py-1 text-xs font-medium text-muted-foreground">Archived council discussions</p>
+                      <div className="space-y-1 px-1 pb-1">
+                        {archivedCouncilThreads.map((thread) => (
+                          <Link key={thread.id} href={`/councils/t/${thread.id}`} className="block rounded-md px-2 py-2 text-sm text-muted-foreground hover:bg-muted/50">
+                            {thread.title}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               </SidebarGroupContent>

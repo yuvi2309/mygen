@@ -10,9 +10,17 @@ const USER_SCOPE_MIGRATION_KEY = "mygen_user_scope_v1";
 const AUTO_ARCHIVE_AFTER_DAYS = 14;
 const ARCHIVED_RETENTION_DAYS = 30;
 
+export interface WorkspaceSnapshot {
+  updatedAt: string;
+  agents: Agent[];
+  threads: StoredThread[];
+  messagesByThread: Record<string, StoredMessage[]>;
+}
+
 export interface WorkspaceUser {
   id: string;
   name: string;
+  email?: string;
   createdAt: string;
 }
 
@@ -105,6 +113,42 @@ export function createWorkspaceUser(name: string): WorkspaceUser {
   localStorage.setItem(CURRENT_USER_KEY, user.id);
   dispatchStorageSync();
   return user;
+}
+
+export function syncAuthenticatedWorkspaceUser(input: {
+  id: string;
+  name?: string;
+  email?: string;
+}): WorkspaceUser {
+  const users = ensureWorkspaceUsers();
+  const existing = users.find((user) => user.id === input.id);
+
+  const syncedUser: WorkspaceUser = {
+    id: input.id,
+    name:
+      input.name?.trim() ||
+      existing?.name ||
+      input.email?.split("@")[0] ||
+      "User",
+    email: input.email ?? existing?.email,
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+  };
+
+  const nextUsers = existing
+    ? users.map((user) => (user.id === input.id ? syncedUser : user))
+    : [...users, syncedUser];
+
+  localStorage.setItem(USERS_KEY, JSON.stringify(nextUsers));
+  localStorage.setItem(CURRENT_USER_KEY, syncedUser.id);
+  dispatchStorageSync();
+
+  return syncedUser;
+}
+
+export function clearCurrentUserSelection() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(CURRENT_USER_KEY);
+  dispatchStorageSync();
 }
 
 function migrateLegacyDataIfNeeded(userId: string) {
@@ -430,6 +474,7 @@ export interface StoredMessage {
   id: string;
   role: "user" | "assistant" | "system" | "tool";
   content: string;
+  node?: string;
   toolCalls?: Array<{ id: string; name: string; args: Record<string, unknown> }>;
   toolCallId?: string;
   toolName?: string;
@@ -482,6 +527,38 @@ export function saveMessages(threadId: string, messages: StoredMessage[]): void 
   if (typeof window === "undefined") return;
   localStorage.setItem(threadMessagesKey(threadId, getCurrentUserId()), JSON.stringify(messages));
   updateThread(threadId, { messageCount: messages.length });
+}
+
+export function getWorkspaceSnapshot(): WorkspaceSnapshot {
+  const threads = getThreads();
+  const messagesByThread = Object.fromEntries(
+    threads.map((thread) => [thread.id, getMessages(thread.id)])
+  );
+
+  return {
+    updatedAt: new Date().toISOString(),
+    agents: getAgents(),
+    threads,
+    messagesByThread,
+  };
+}
+
+export function applyWorkspaceSnapshot(snapshot: WorkspaceSnapshot, userId = getCurrentUserId()) {
+  if (typeof window === "undefined") return;
+
+  localStorage.setItem(getUserStorageKey(STORAGE_KEY, userId), JSON.stringify(snapshot.agents ?? []));
+  localStorage.setItem(getUserStorageKey(THREADS_KEY, userId), JSON.stringify(snapshot.threads ?? []));
+
+  const existingThreads = getThreads().map((thread) => thread.id);
+  existingThreads.forEach((threadId) => {
+    localStorage.removeItem(threadMessagesKey(threadId, userId));
+  });
+
+  Object.entries(snapshot.messagesByThread ?? {}).forEach(([threadId, messages]) => {
+    localStorage.setItem(threadMessagesKey(threadId, userId), JSON.stringify(messages));
+  });
+
+  dispatchStorageSync();
 }
 
 export function updateMessage(

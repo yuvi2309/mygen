@@ -15,16 +15,20 @@ import {
 } from "@/lib/store";
 
 export function useThreads(agentId?: string) {
-  const [threads, setThreads] = useState<StoredThread[]>(() => getThreads(agentId));
+  const [threads, setThreads] = useState<StoredThread[]>([]);
 
   const refresh = useCallback(() => {
     setThreads(getThreads(agentId));
   }, [agentId]);
 
   useEffect(() => {
+    const timeoutId = window.setTimeout(() => refresh(), 0);
     const handler = () => refresh();
     window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("storage", handler);
+    };
   }, [refresh]);
 
   const createThread = useCallback((targetAgentId: string, title?: string) => {

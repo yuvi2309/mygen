@@ -8,6 +8,7 @@ import { useAgents } from "@/hooks/use-agents";
 
 export default function AgentsPage() {
   const { agents, deleteAgent } = useAgents();
+  const singleAgents = agents.filter((agent) => agent.mode !== "council");
 
   return (
     <div className="flex-1 overflow-auto">
@@ -28,14 +29,14 @@ export default function AgentsPage() {
         </div>
 
         <div className="grid gap-4">
-          {agents.map((agent) => (
+          {singleAgents.map((agent) => (
             <AgentCard key={agent.id} agent={agent} onDelete={deleteAgent} />
           ))}
         </div>
 
-        {agents.length === 0 && (
+        {singleAgents.length === 0 && (
           <div className="text-center py-16">
-            <p className="text-muted-foreground">No agents yet.</p>
+            <p className="text-muted-foreground">No single agents yet.</p>
             <Button className="mt-4" asChild>
               <Link href="/agents/new">Create your first agent</Link>
             </Button>

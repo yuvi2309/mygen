@@ -18,6 +18,30 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Authentication setup
+
+This app now includes protected sign-in and sign-up flows for multi-user usage.
+
+1. Add these variables to `.env.local`:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+2. In Supabase Auth, enable:
+   - Email and password sign-in
+   - Email confirmation or verification
+   - Google provider if you want one-click login
+
+3. Start the app and open `/auth`.
+
+Security defaults in this setup:
+- session-based authorization for private routes and API endpoints
+- passwords handled by the auth provider, not stored in the browser
+- email verification support and clean separation of public and private surfaces
+- authenticated workspace data is now synced to Supabase-backed remote persistence for each user
+
 ## AI development workflow
 
 This repository is now configured for GitHub Copilot with:

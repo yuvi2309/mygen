@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChatInterface } from "@/components/chat/chat-interface";
 import { DEFAULT_AGENT, type Agent } from "@/lib/types";
-import { getAgent, getThread, getMessages } from "@/lib/store";
+import { getAgent, getThread, getMessages, type StoredMessage, type StoredThread } from "@/lib/store";
 import { useAgents } from "@/hooks/use-agents";
 
 export default function ThreadChatPage() {
@@ -12,18 +12,33 @@ export default function ThreadChatPage() {
   const router = useRouter();
   const { agents } = useAgents();
   const threadId = params.threadId as string;
-  const thread = useMemo(() => getThread(threadId), [threadId]);
-  const initialMessages = useMemo(() => (thread ? getMessages(threadId) : null), [thread, threadId]);
-  const agent = useMemo(() => {
-    if (!thread) return null;
-    return getAgent(thread.agentId) ?? DEFAULT_AGENT;
-  }, [thread]);
+  const [thread, setThread] = useState<StoredThread | null | undefined>(undefined);
+  const [initialMessages, setInitialMessages] = useState<StoredMessage[] | null>(null);
+  const [agent, setAgent] = useState<Agent | null>(null);
 
   useEffect(() => {
-    if (!thread) {
+    const loadConversation = () => {
+      const nextThread = getThread(threadId) ?? null;
+      setThread(nextThread);
+      setInitialMessages(nextThread ? getMessages(threadId) : null);
+      setAgent(nextThread ? getAgent(nextThread.agentId) ?? DEFAULT_AGENT : null);
+    };
+
+    loadConversation();
+    window.addEventListener("storage", loadConversation);
+    return () => window.removeEventListener("storage", loadConversation);
+  }, [threadId]);
+
+  useEffect(() => {
+    if (thread === null) {
       router.replace("/chat");
+      return;
     }
-  }, [thread, router]);
+
+    if (agent?.mode === "council") {
+      router.replace(`/councils/t/${threadId}`);
+    }
+  }, [agent, thread, threadId, router]);
 
   if (!agent || !thread || initialMessages === null) {
     return (
@@ -34,16 +49,18 @@ export default function ThreadChatPage() {
   }
 
   function handleAgentChange(newAgent: Agent) {
-    router.replace(`/chat/${newAgent.id}`);
+    router.replace(newAgent.mode === "council" ? `/councils/${newAgent.id}` : `/chat/${newAgent.id}`);
   }
 
   return (
     <ChatInterface
       agent={agent}
-      agents={agents}
+      agents={agents.filter((item) => item.mode !== "council")}
       onAgentChange={handleAgentChange}
       threadId={threadId}
       initialMessages={initialMessages}
+      draftPath={`/chat/${agent.id}`}
+      threadPathPrefix="/chat/t"
     />
   );
 }

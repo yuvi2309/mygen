@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChatInterface } from "@/components/chat/chat-interface";
 import { DEFAULT_AGENT } from "@/lib/types";
@@ -12,14 +12,31 @@ export default function AgentChatPage() {
   const router = useRouter();
   const { agents } = useAgents();
   const agentId = params.agentId as string;
-  const agent = useMemo(() => {
-    if (agentId === "default") return DEFAULT_AGENT;
-    return getAgent(agentId) ?? null;
+  const [agent, setAgent] = useState<typeof DEFAULT_AGENT | null | undefined>(undefined);
+
+  useEffect(() => {
+    const loadAgent = () => {
+      if (agentId === "default") {
+        setAgent(DEFAULT_AGENT);
+        return;
+      }
+
+      setAgent(getAgent(agentId) ?? null);
+    };
+
+    loadAgent();
+    window.addEventListener("storage", loadAgent);
+    return () => window.removeEventListener("storage", loadAgent);
   }, [agentId]);
 
   useEffect(() => {
-    if (!agent) {
+    if (agent === null) {
       router.replace("/chat");
+      return;
+    }
+
+    if (agent?.mode === "council") {
+      router.replace(`/councils/${agent.id}`);
     }
   }, [agent, router]);
 
@@ -32,14 +49,16 @@ export default function AgentChatPage() {
   }
 
   function handleAgentChange(newAgent: typeof DEFAULT_AGENT) {
-    router.replace(`/chat/${newAgent.id}`);
+    router.replace(newAgent.mode === "council" ? `/councils/${newAgent.id}` : `/chat/${newAgent.id}`);
   }
 
   return (
     <ChatInterface
       agent={agent}
-      agents={agents}
+      agents={agents.filter((item) => item.mode !== "council")}
       onAgentChange={handleAgentChange}
+      draftPath={`/chat/${agent.id}`}
+      threadPathPrefix="/chat/t"
     />
   );
 }

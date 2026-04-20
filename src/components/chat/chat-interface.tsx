@@ -17,6 +17,8 @@ interface ChatInterfaceProps {
   onAgentChange?: (agent: Agent) => void;
   threadId?: string;
   initialMessages?: StoredMessage[];
+  draftPath?: string;
+  threadPathPrefix?: string;
 }
 
 function uiMessagesToStored(
@@ -64,6 +66,7 @@ function agentMessagesToStored(
       id: message.id,
       role: message.role,
       content: message.content,
+      node: message.node,
       toolCalls: message.toolCalls,
       toolCallId: message.toolCallId,
       toolName: message.toolName,
@@ -90,6 +93,7 @@ function storedToAgentMessages(messages: StoredMessage[]): AgentMessage[] {
     id: message.id,
     role: message.role as AgentMessage["role"],
     content: message.content,
+    node: message.node,
     toolCalls: message.toolCalls,
     toolCallId: message.toolCallId,
     toolName: message.toolName,
@@ -103,11 +107,13 @@ export function ChatInterface({
   onAgentChange,
   threadId: initialThreadId,
   initialMessages,
+  draftPath = "/chat",
+  threadPathPrefix = "/chat/t",
 }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const [extraTools, setExtraTools] = useState<AgentTool[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [agentMode, setAgentMode] = useState(false);
+  const [agentMode, setAgentMode] = useState(agent.mode === "council");
   const [activeThreadId, setActiveThreadId] = useState<string | null>(initialThreadId ?? null);
   const [pendingResend, setPendingResend] = useState<string | null>(null);
   const [messageMeta, setMessageMeta] = useState<Record<string, Partial<StoredMessage>>>(() =>
@@ -145,6 +151,8 @@ export function ChatInterface({
             tools: agent.tools,
             temperature: agent.temperature,
             maxTokens: agent.maxTokens,
+            mode: agent.mode,
+            council: agent.council,
           },
           extraTools,
         },
@@ -217,6 +225,12 @@ export function ChatInterface({
   }, []);
 
   useEffect(() => {
+    if (agent.mode === "council") {
+      setAgentMode(true);
+    }
+  }, [agent.id, agent.mode]);
+
+  useEffect(() => {
     if (!pendingResend || isLoading) return;
 
     const resend = async () => {
@@ -266,7 +280,7 @@ export function ChatInterface({
       const thread = createThread(agent.id, title);
       currentThreadId = thread.id;
       setActiveThreadId(thread.id);
-      window.history.replaceState(null, "", `/chat/t/${thread.id}`);
+      window.history.replaceState(null, "", `${threadPathPrefix}/${thread.id}`);
     }
 
     if (agentMode) {
@@ -650,14 +664,14 @@ export function ChatInterface({
     if (!window.confirm("Reset this chat and start fresh?")) return;
     clearConversationState();
     setActiveThreadId(null);
-    window.history.replaceState(null, "", "/chat");
+    window.history.replaceState(null, "", draftPath);
   }
 
   function handleForkFromMessage(messageId: string) {
     if (!activeThreadId) return;
     const forked = forkThread(activeThreadId, { upToMessageId: messageId });
     if (forked) {
-      window.location.href = `/chat/t/${forked.id}`;
+      window.location.href = `${threadPathPrefix}/${forked.id}`;
     }
   }
 
@@ -665,7 +679,7 @@ export function ChatInterface({
     if (!activeThreadId) return;
     const forked = forkThread(activeThreadId);
     if (forked) {
-      window.location.href = `/chat/t/${forked.id}`;
+      window.location.href = `${threadPathPrefix}/${forked.id}`;
     }
   }
 
@@ -683,6 +697,19 @@ export function ChatInterface({
           )}
         </div>
       </div>
+
+      {agent.mode === "council" && (
+        <div className="border-b bg-primary/5 px-4 py-1.5 text-xs text-muted-foreground">
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-2">
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
+              Council
+            </span>
+            <span>
+              {agent.council?.experts.length ?? 0} experts debate, critique, and the authority consolidates the answer.
+            </span>
+          </div>
+        </div>
+      )}
 
       {agentMode && agentChat.isRunning && agentChat.currentNode && (
         <div className="flex items-center gap-2 border-b bg-muted/30 px-4 py-1.5 text-xs text-muted-foreground">

@@ -1,6 +1,7 @@
 import { streamText, convertToModelMessages, stepCountIs } from "ai";
 import { z } from "zod/v4";
 import { getModel, resolveTools } from "@/lib/ai";
+import { getAuthenticatedUser } from "@/lib/auth/supabase-server";
 import { AgentModelSchema, AgentToolSchema } from "@/lib/types";
 
 // ─── Request Validation ─────────────────────────────────────────────────────
@@ -21,6 +22,11 @@ const ChatRequestSchema = z.object({
 // ─── Route Handler ──────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();

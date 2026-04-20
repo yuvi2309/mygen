@@ -1,6 +1,7 @@
 import { generateText } from "ai";
 import { z } from "zod/v4";
 import { getModel } from "@/lib/ai";
+import { getAuthenticatedUser } from "@/lib/auth/supabase-server";
 import { AgentModelSchema, AgentToolSchema } from "@/lib/types";
 
 const SelectionRequestSchema = z.object({
@@ -25,6 +26,11 @@ const SelectionRequestSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();

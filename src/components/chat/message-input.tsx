@@ -86,6 +86,7 @@ export function MessageInput({
 
   // Tools already on the agent (not toggleable, just shown as context)
   const agentToolIds = agent?.tools ?? [];
+  const isCouncilAgent = agent?.mode === "council";
 
   return (
     <div className="border-t bg-background px-4 py-3">
@@ -204,14 +205,14 @@ export function MessageInput({
             {onAgentModeChange && (
               <Button
                 type="button"
-                variant={agentMode ? "default" : "ghost"}
+                variant={agentMode || isCouncilAgent ? "default" : "ghost"}
                 size="sm"
-                className={`shrink-0 gap-1 h-8 px-2 ${agentMode ? "bg-primary text-primary-foreground" : ""}`}
-                onClick={() => onAgentModeChange(!agentMode)}
-                title={agentMode ? "Agent mode (LangGraph)" : "Simple mode"}
+                className={`shrink-0 gap-1 h-8 px-2 ${agentMode || isCouncilAgent ? "bg-primary text-primary-foreground" : ""}`}
+                onClick={() => onAgentModeChange(isCouncilAgent ? true : !agentMode)}
+                title={isCouncilAgent ? "Council mode" : agentMode ? "Agent mode (LangGraph)" : "Simple mode"}
               >
                 <Zap className="h-3.5 w-3.5" />
-                <span className="text-xs hidden sm:inline">{agentMode ? "Agent" : "Simple"}</span>
+                <span className="text-xs hidden sm:inline">{isCouncilAgent ? "Council" : agentMode ? "Agent" : "Simple"}</span>
               </Button>
             )}
 

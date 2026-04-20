@@ -14,9 +14,13 @@ src/components/chat/chat-interface.tsx ← message-list, message-input
 src/components/chat/message-list.tsx ← tool-call-display, structured-message-content
 src/lib/agent/graph.ts ← state, nodes
 src/lib/agent/nodes.ts ← state, tools
+src/lib/auth/admin.ts ← config
+src/lib/auth/proxy.ts ← config
+src/lib/auth/supabase-browser.ts ← config
+src/lib/auth/supabase-server.ts ← config
 ```
 
-## changes (last 5 commits — 71 minutes ago)
+## changes (last 5 commits — 28 hours ago)
 ```
 src/app/(workspace)/agents/[agentId]/page.tsx +EditAgentPage  +handleSave
 src/app/(workspace)/agents/new/page.tsx       +NewAgentPage  +handleSave
@@ -28,15 +32,16 @@ src/app/(workspace)/layout.tsx                +WorkspaceLayout
 src/app/(workspace)/page.tsx                  +WorkspacePage
 src/app/api/agent/chat/route.ts               +toLangChainMessages  +POST  +formatSSEUpdate
 src/app/api/chat/route.ts                     +POST
+src/app/api/selection/route.ts                +POST
 src/app/layout.tsx                            ~RootLayout
 src/app/page.tsx                              ~Home
 src/components/agents/agent-card.tsx          +AgentCard
 src/components/agents/agent-form.tsx          +AgentForm  +handleToggleTool  +handleSubmit
 src/components/chat/chat-interface.tsx        +uiMessagesToStored  +agentMessagesToStored  +storedToUIMessages  +storedToAgentMessages
 src/components/chat/message-input.tsx         +MessageInput  +handleKeyDown  +handleFileSelect  +handleFileChange
-src/components/chat/message-list.tsx          +isToolPart  +getToolName  +getToolState  +MessageList
+src/components/chat/message-list.tsx          +isToolPart  +getToolName  +getToolState  +formatTimestamp
+src/components/chat/structured-message-content.tsx +tryParseJson  +parseCodeSegments  +parseMarkdownTable  +looksLikeHtml
 src/components/chat/tool-call-display.tsx     +ToolCallDisplay
-src/components/ui/button.tsx                  +Button
 src/components/ui/card.tsx                    +Card  +CardHeader  +CardTitle  +CardDescription
 src/components/ui/dialog.tsx                  +Dialog  +DialogTrigger  +DialogPortal  +DialogClose
 src/components/ui/input.tsx                   +Input
@@ -48,7 +53,8 @@ src/components/ui/skeleton.tsx                +Skeleton
 src/components/ui/tabs.tsx                    +Tabs  +TabsList  +TabsTrigger  +TabsContent
 src/components/ui/textarea.tsx                +Textarea
 src/components/ui/tooltip.tsx                 +TooltipProvider  +Tooltip  +TooltipTrigger  +TooltipContent
-src/components/workspace/app-sidebar.tsx      +AppSidebar
+src/components/workspace/app-sidebar.tsx      +AppSidebar  +toggleSelected  +handleTagEdit  +handleBulkArchive
+src/components/workspace/user-switcher.tsx    +UserSwitcher  +handleCreateUser  +handleSwitchUser
 src/hooks/use-agent-chat.ts                   +useAgentChat  +handleSSEEvent
 src/hooks/use-agents.ts                       +useAgents
 src/hooks/use-mobile.ts                       +useIsMobile
@@ -58,8 +64,7 @@ src/lib/agent/nodes.ts                        +createModel  +agentNode  +createT
 src/lib/agent/tools.ts                        +getTvly  +resolveLangChainTools  +getAvailableToolNames
 src/lib/ai/provider.ts                        +getModel  +parseModelSpec
 src/lib/ai/tools.ts                           +getTvly  +resolveTools
-src/lib/store.ts                              +threadMessagesKey  +generateId  +getAgents  +getAgent
-src/lib/utils.ts                              +cn
+src/lib/store.ts                              +getUserStorageKey  +threadMessagesKey  +readJSON  +dispatchStorageSync
 docs/adr/adr-001-platform-direction.md        +objects
 ```
 
@@ -137,6 +142,30 @@ h3 Agent Management
 h3 Model Strategy
 ```
 
+### docs/adr/adr-002-authentication-and-access.md
+```
+h1 ADR: Authentication and Access for MyGen
+h2 Status
+h2 Context
+h2 Decision
+h2 Why this decision
+h2 Consequences
+h3 Positive
+h3 Negative
+```
+
+### docs/specs/council-mode-spec.md
+```
+h1 Council Mode Specification
+h2 Goal
+h2 User problem
+h2 Core workflow
+h2 MVP scope
+h2 Output requirements
+h2 Safety and quality
+h2 Extension ideas
+```
+
 ## src
 
 ### src/app/(workspace)/agents/[agentId]/page.tsx
@@ -145,7 +174,7 @@ component EditAgentPage
 hook useParams
 hook useRouter
 hook useAgents
-hook useMemo
+hook useState
 hook useEffect
 handler onSave
 ```
@@ -171,7 +200,7 @@ component AgentChatPage
 hook useParams
 hook useRouter
 hook useAgents
-hook useMemo
+hook useState
 hook useEffect
 handler onAgentChange
 ```
@@ -180,6 +209,7 @@ handler onAgentChange
 ```
 component ChatPage
 hook useAgents
+hook useMemo
 hook useState
 handler onAgentChange
 ```
@@ -190,7 +220,7 @@ component ThreadChatPage
 hook useParams
 hook useRouter
 hook useAgents
-hook useMemo
+hook useState
 hook useEffect
 handler onAgentChange
 ```
@@ -211,6 +241,11 @@ export async function POST(request)
 ```
 
 ### src/app/api/chat/route.ts
+```
+export async function POST(request)
+```
+
+### src/app/api/selection/route.ts
 ```
 export async function POST(request)
 ```
@@ -267,9 +302,11 @@ component AgentForm
 props AgentFormProps
 hook useRouter
 hook useState
+hook useMemo
 export AgentForm
 handler onSubmit
 handler onChange
+handler onClick
 ```
 
 ### src/components/chat/chat-interface.tsx
@@ -289,6 +326,7 @@ handler onPinMessage
 handler onForkFromMessage
 handler onKeepSelection
 handler onAskSelectionBranch
+handler onCreateBranch
 handler onTrimMessage
 handler onRestoreMessage
 handler onRemoveSelection
@@ -298,7 +336,6 @@ handler onSubmit
 handler onStop
 handler onAgentChange
 handler onExtraToolsChange
-handler onFilesChange
 ```
 
 ### src/components/chat/message-input.tsx
@@ -325,8 +362,19 @@ hook useMemo
 hook useEffect
 export MessageList
 handler onMouseDown
+handler onOpenChange
 handler onSubmit
 handler onChange
+```
+
+### src/components/chat/structured-message-content.tsx
+```
+component JsonTable
+component MarkdownTable
+component StructuredMessageContent
+props StructuredMessageContentProps
+export StructuredMessageContent
+handler onValue
 ```
 
 ### src/components/chat/tool-call-display.tsx
@@ -465,17 +513,26 @@ handler onOpenChange
 handler onClick
 ```
 
+### src/components/workspace/user-switcher.tsx
+```
+component UserSwitcher
+hook useRouter
+hook useEffect
+export UserSwitcher
+handler onSelect
+```
+
 ### src/hooks/use-agent-chat.ts
 ```
 export interface AgentMessage
   id: string
   role: "user" | "assistant" | "tool"
   content: string
+  node?: string
   toolCalls?: Array<{ id: string
   name: string
   args: Record<string, unknown>
   toolCallId?: string
-  toolName?: string
 export interface AgentChatState
   messages: AgentMessage[]
   isRunning: boolean
@@ -553,9 +610,15 @@ export function resolveTools(toolNames) → ToolSet
 
 ### src/lib/store.ts
 ```
+export interface WorkspaceSnapshot
+  updatedAt: string
+  agents: Agent[]
+  threads: StoredThread[]
+  messagesByThread: Record<string, StoredMessage[]>
 export interface WorkspaceUser
   id: string
   name: string
+  email?: string
   createdAt: string
 export interface StoredThread
   id: string
@@ -572,12 +635,6 @@ export interface StoredBranchChatMessage
   content: string
   createdAt: string
   status?: "loading" | "done" | "error"
-export interface StoredMessageBranch
-  id: string
-  selectedText: string
-  createdAt: string
-  title?: string
-  messages: StoredBranchChatMessage[]
 ```
 
 ### src/lib/types/agent.ts
@@ -585,6 +642,9 @@ export interface StoredMessageBranch
 export type Agent
 export type AgentModel
 export type AgentTool
+export type AgentMode
+export type CouncilExpert
+export type CouncilConfig
 export type CreateAgentInput
 ```
 
@@ -616,27 +676,118 @@ export interface ChatThread
 export function cn(...inputs)
 ```
 
-### src/app/api/selection/route.ts
+### src/app/(workspace)/councils/[councilId]/edit/page.tsx
 ```
-export async function POST(request)
-```
-
-### src/components/chat/structured-message-content.tsx
-```
-component JsonTable
-component MarkdownTable
-component StructuredMessageContent
-props StructuredMessageContentProps
-export StructuredMessageContent
-handler onValue
-```
-
-### src/components/workspace/user-switcher.tsx
-```
-component UserSwitcher
+component EditCouncilPage
+hook useParams
 hook useRouter
+hook useAgents
+hook useMemo
+hook useEffect
+handler onSave
+```
+
+### src/app/(workspace)/councils/[councilId]/page.tsx
+```
+component CouncilPage
+hook useParams
+hook useRouter
+hook useAgents
 hook useState
 hook useEffect
-export UserSwitcher
-handler onSelect
+handler onAgentChange
+```
+
+### src/app/(workspace)/councils/new/page.tsx
+```
+component NewCouncilPage
+hook useRouter
+hook useAgents
+handler onSave
+```
+
+### src/app/(workspace)/councils/page.tsx
+```
+component CouncilsPage
+hook useAgents
+handler onDelete
+```
+
+### src/app/(workspace)/councils/t/[threadId]/page.tsx
+```
+component CouncilThreadPage
+hook useParams
+hook useRouter
+hook useAgents
+hook useState
+hook useEffect
+handler onAgentChange
+```
+
+### src/app/api/workspace/snapshot/route.ts
+```
+export async function GET()
+export async function POST()
+```
+
+### src/app/auth/callback/route.ts
+```
+export async function GET(request)
+```
+
+### src/app/auth/page.tsx
+```
+component AuthPage
+```
+
+### src/components/auth/auth-form.tsx
+```
+component AuthForm
+hook useEffect
+hook useState
+export AuthForm
+handler onClick
+handler onValueChange
+handler onSubmit
+handler onChange
+```
+
+### src/components/auth/workspace-sync.tsx
+```
+component WorkspaceSync
+hook useEffect
+export WorkspaceSync
+```
+
+### src/lib/auth/admin.ts
+```
+export function hasSupabaseServiceRoleKey()
+export function createSupabaseAdminClient()
+```
+
+### src/lib/auth/config.ts
+```
+export function hasSupabaseAuthConfig()
+export function getSupabaseAuthConfig()
+```
+
+### src/lib/auth/proxy.ts
+```
+export async function updateSession(request)
+```
+
+### src/lib/auth/supabase-browser.ts
+```
+export function getSupabaseBrowserClient()
+```
+
+### src/lib/auth/supabase-server.ts
+```
+export async function createSupabaseServerClient()
+export async function getAuthenticatedUser()
+```
+
+### src/lib/persistence/workspace-schema.ts
+```
+export type WorkspaceSnapshot
 ```
